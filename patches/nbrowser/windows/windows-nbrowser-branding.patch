@@ -1,5 +1,5 @@
 diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
-index 12a62d6803..1d69087e6a 100644
+index 12a62d6803..988643cbae 100644
 --- a/chrome/app/chromium_strings.grd
 +++ b/chrome/app/chromium_strings.grd
 @@ -278,46 +278,46 @@ If you update this file, be sure also to update google_chrome_strings.grd. -->
@@ -103,29 +103,29 @@ index 12a62d6803..1d69087e6a 100644
        </message>
        <if expr="not is_android">
          <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_TOO_MANY_BOOKMARKS_BODY" desc="Body of the signout confirmation dialog when the user has too many bookmarks.">
--        You reached ChromiumΓÇÖs limit of <ph name="BOOKMARK_LIMIT">$1<ex>100,000</ex></ph> bookmarks, so some of your bookmarks havenΓÇÖt been saved in your Google Account yet.
-+        You reached NBrowser limit of <ph name="BOOKMARK_LIMIT">$1<ex>100,000</ex></ph> bookmarks, so some of your bookmarks havenΓÇÖt been saved in your Google Account yet.
+-        You reached Chromium’s limit of <ph name="BOOKMARK_LIMIT">$1<ex>100,000</ex></ph> bookmarks, so some of your bookmarks haven’t been saved in your Google Account yet.
++        You reached NBrowser’s limit of <ph name="BOOKMARK_LIMIT">$1<ex>100,000</ex></ph> bookmarks, so some of your bookmarks haven’t been saved in your Google Account yet.
  
- New bookmarks canΓÇÖt be saved in your account until you delete some. If you sign out now, unsaved bookmarks will be deleted.
+ New bookmarks can’t be saved in your account until you delete some. If you sign out now, unsaved bookmarks will be deleted.
          </message>
        </if>
        <if expr="is_android">
          <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_TOO_MANY_BOOKMARKS_BODY" desc="Body of the signout confirmation dialog when the user has too many bookmarks." formatter_data="android_java">
--        You reached ChromiumΓÇÖs limit of <ph name="BOOKMARK_LIMIT">%1$s<ex>100,000</ex></ph> bookmarks, so some of your bookmarks havenΓÇÖt been saved in your Google Account yet.
-+        You reached NBrowser limit of <ph name="BOOKMARK_LIMIT">%1$s<ex>100,000</ex></ph> bookmarks, so some of your bookmarks havenΓÇÖt been saved in your Google Account yet.
+-        You reached Chromium’s limit of <ph name="BOOKMARK_LIMIT">%1$s<ex>100,000</ex></ph> bookmarks, so some of your bookmarks haven’t been saved in your Google Account yet.
++        You reached NBrowser’s limit of <ph name="BOOKMARK_LIMIT">%1$s<ex>100,000</ex></ph> bookmarks, so some of your bookmarks haven’t been saved in your Google Account yet.
  
- New bookmarks canΓÇÖt be saved in your account until you delete some. If you sign out now, unsaved bookmarks will be deleted.
+ New bookmarks can’t be saved in your account until you delete some. If you sign out now, unsaved bookmarks will be deleted.
          </message>
-@@ -415,7 +415,7 @@ New bookmarks canΓÇÖt be saved in your account until you delete some. If you sig
+@@ -415,7 +415,7 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
              <ph name="LINE_BREAK">&lt;br&gt;</ph>
-             ΓÇó Delete cookies and other temporary site data
+             • Delete cookies and other temporary site data
              <ph name="LINE_BREAK">&lt;br&gt;</ph>
--            ΓÇó Reset Chromium shortcuts
-+            ΓÇó Reset NBrowser shortcuts
+-            • Reset Chromium shortcuts
++            • Reset NBrowser shortcuts
              <ph name="LINE_BREAKS">&lt;br&gt;&lt;br&gt;</ph>
              Bookmarks, history, and saved passwords won't be affected.
          </message>
-@@ -438,12 +438,12 @@ New bookmarks canΓÇÖt be saved in your account until you delete some. If you sig
+@@ -438,12 +438,12 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
          <if expr="_is_chrome_for_testing_branded">
            <then>
              <message name="IDS_BROWSER_WINDOW_TITLE_FORMAT" desc="The format for titles displayed in tabs and popup windows">
@@ -140,7 +140,7 @@ index 12a62d6803..1d69087e6a 100644
              </message>
            </else>
          </if>
-@@ -451,19 +451,19 @@ New bookmarks canΓÇÖt be saved in your account until you delete some. If you sig
+@@ -451,19 +451,19 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
        <if expr="is_chromeos">
          <!-- Browser Window Title Format -->
          <message name="IDS_BROWSER_WINDOW_TITLE_FORMAT" desc="The format for titles displayed in tabbed browser windows">
@@ -163,7 +163,7 @@ index 12a62d6803..1d69087e6a 100644
          </message>
        </if>
        <if expr="is_macosx">
-@@ -482,46 +482,46 @@ New bookmarks canΓÇÖt be saved in your account until you delete some. If you sig
+@@ -482,46 +482,46 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
          </then>
          <else>
            <message name="IDS_ACCESSIBLE_BROWSER_WINDOW_TITLE_FORMAT" desc="The format for the accessible name of a tabbed browser window">
@@ -221,7 +221,7 @@ index 12a62d6803..1d69087e6a 100644
          </message>
        </if>
        <if expr="_is_chrome_for_testing_branded">
-@@ -532,123 +532,123 @@ New bookmarks canΓÇÖt be saved in your account until you delete some. If you sig
+@@ -532,123 +532,123 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
          </then>
          <else>
            <message name="IDS_ABOUT_TERMS_OF_SERVICE" desc="The terms of service label in the About box." translateable="false">
@@ -821,12 +821,12 @@ index 12a62d6803..1d69087e6a 100644
 +        NBrowser can't verify where this extension comes from, and it might be unsafe. Remove it from NBrowser so it can no longer see and change your data on sites you visit, including personal info.
        </message>
        <message name="IDS_EXTENSIONS_SAFETY_CHECK_OFFSTORE_ON" desc="Alerts the user that the extension is not from the Chrome web store.">
--        On ΓÇó Chromium can't verify where this extension comes from
-+        On ΓÇó NBrowser can't verify where this extension comes from
+-        On • Chromium can't verify where this extension comes from
++        On • NBrowser can't verify where this extension comes from
        </message>
        <message name="IDS_EXTENSIONS_SAFETY_CHECK_OFFSTORE_OFF" desc="Alerts the user that the extension is not from the Chrome web store.">
--        Off ΓÇó Chromium can't verify where this extension comes from
-+        Off ΓÇó NBrowser can't verify where this extension comes from
+-        Off • Chromium can't verify where this extension comes from
++        Off • NBrowser can't verify where this extension comes from
        </message>
        <message name="IDS_EXTENSIONS_SAFETY_CHECK_NO_PRIVACY_PRACTICES" desc="Alerts the user that the extension has not disclosed its privacy practices.">
 -        This extension hasn't published privacy practices, such as how it collects and uses data. Chromium recommends that you remove it.
@@ -1177,7 +1177,7 @@ index 12a62d6803..1d69087e6a 100644
        <if expr="not is_chromeos">
          <message name="IDS_SIGNIN_EMAIL_CONFIRMATION_TITLE" desc="Title of the signin email confirmation tab modal dialog.">
 -          <ph name="USER_EMAIL_ADDRESS">$1<ex>foo@gmail.com</ex></ph> was previously using Chromium
-+          <ph name="USER_EMAIL_ADDRESS">$1<ex>foo@9ma1l.qjz9zk</ex></ph> was previously using NBrowser
++          <ph name="USER_EMAIL_ADDRESS">$1<ex>foo@gmail.com</ex></ph> was previously using NBrowser
          </message>
        </if>
  
@@ -1233,12 +1233,12 @@ index 12a62d6803..1d69087e6a 100644
 -        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_SWITCH_BUBBLE_DESC_V2" desc="This string is the body text for a dialog that appears when the user is already signed in to Chromium, but they just tried to sign in to a Google service (like Gmail) with a different Google Account that already has its own Chromium profile on this device. The body text is after the 'Switch to existing Chromium profile?' string. The tone should be inviting and helpful.">
 -          You're already signed in as <ph name="USER_EMAIL_ADDRESS">$1<ex>foo@gmail.com</ex></ph> in another Chromium profile
 +        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_SWITCH_BUBBLE_DESC_V2" desc="This string is the body text for a dialog that appears when the user is already signed in to NBrowser, but they just tried to sign in to a Google service (like Gmail) with a different Google Account that already has its own NBrowser profile on this device. The body text is after the 'Switch to existing NBrowser profile?' string. The tone should be inviting and helpful.">
-+          You're already signed in as <ph name="USER_EMAIL_ADDRESS">$1<ex>foo@9ma1l.qjz9zk</ex></ph> in another NBrowser profile
++          You're already signed in as <ph name="USER_EMAIL_ADDRESS">$1<ex>foo@gmail.com</ex></ph> in another NBrowser profile
          </message>
 -        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_SWITCH_BUBBLE_DESC_V2_SUPERVISED" desc="This string is the body text for a dialog that appears when the user is already signed in to Chromium, but they just tried to sign in to a Google service (like Gmail) with a different supervised Google Account that already has its own Chromium profile on this device. The body text is after the 'Switch to existing Chromium profile?' string. The tone should be inviting and helpful.">
--          To stay safer online with your parentΓÇÖs choices, switch to your Chromium profile where youΓÇÖre already signed in as <ph name="USER_EMAIL_ADDRESS">$1<ex>foo@gmail.com</ex></ph>
+-          To stay safer online with your parent’s choices, switch to your Chromium profile where you’re already signed in as <ph name="USER_EMAIL_ADDRESS">$1<ex>foo@gmail.com</ex></ph>
 +        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_SWITCH_BUBBLE_DESC_V2_SUPERVISED" desc="This string is the body text for a dialog that appears when the user is already signed in to NBrowser, but they just tried to sign in to a Google service (like Gmail) with a different supervised Google Account that already has its own NBrowser profile on this device. The body text is after the 'Switch to existing NBrowser profile?' string. The tone should be inviting and helpful.">
-+          To stay safer online with your parentΓÇÖs choices, switch to your NBrowser profile where youΓÇÖre already signed in as <ph name="USER_EMAIL_ADDRESS">$1<ex>foo@9ma1l.qjz9zk</ex></ph>
++          To stay safer online with your parent’s choices, switch to your NBrowser profile where you’re already signed in as <ph name="USER_EMAIL_ADDRESS">$1<ex>foo@gmail.com</ex></ph>
          </message>
          <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_CONSUMER_BUBBLE_DESC" desc="Body of the web signin interception bubble">
 -          <ph name="EXISTING_USER">$1<ex>Elisa</ex></ph> is already signed in to this Chromium profile. To keep your browsing separate, Chromium can create your own profile for you.
@@ -1246,7 +1246,7 @@ index 12a62d6803..1d69087e6a 100644
          </message>
          <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_CREATE_BUBBLE_DESC" desc="Body of the web signin interception bubble. It is shown when the user signs in on the web while they already have another account present in the current profile.">
 -          <ph name="EXISTING_USER">$1<ex>Elisa</ex></ph> is already signed in.  To keep your browsing separate, sign in to Chromium in your own profile as <ph name="USER_EMAIL_ADDRESS">$2<ex>foo@gmail.com</ex></ph>.
-+          <ph name="EXISTING_USER">$1<ex>Elisa</ex></ph> is already signed in.  To keep your browsing separate, sign in to NBrowser in your own profile as <ph name="USER_EMAIL_ADDRESS">$2<ex>foo@9ma1l.qjz9zk</ex></ph>.
++          <ph name="EXISTING_USER">$1<ex>Elisa</ex></ph> is already signed in.  To keep your browsing separate, sign in to NBrowser in your own profile as <ph name="USER_EMAIL_ADDRESS">$2<ex>foo@gmail.com</ex></ph>.
          </message>
 -        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_BUBBLE_CHROME_SIGNIN_SUBTITLE" desc="Subtitle of the Chromium Signin Bubble intercept that is shown when a signed out user signs in on the web with it's first account.">
 -          To get your passwords and more on all your devices, sign in to Chromium
@@ -1258,15 +1258,15 @@ index 12a62d6803..1d69087e6a 100644
 +        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_BUBBLE_CHROME_SIGNIN_SUBTITLE_WITH_BOOKMARKS" desc="Subtitle of the NBrowser Signin Bubble intercept that is shown when a signed out user signs in on the web with it's first account.">
 +          To get your passwords, bookmarks, and more on all your devices, sign in to NBrowser
          </message>
--        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_BUBBLE_CHROME_SIGNIN_SUBTITLE_SUPERVISED" desc="This string is the body of a promotion about signing in to Chromium with the user's Google Account. It explains the overarching user benefit of signing in: Kids of a certain age are motivated to get their parentsΓÇÖ help staying safer online, so the tone should be motivating. We want users to understand why signing in is beneficial, and click 'Continue as name' to sign in to their Google Account.">
--          To stay safer online with your parentΓÇÖs choices, sign in to Chromium
-+        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_BUBBLE_CHROME_SIGNIN_SUBTITLE_SUPERVISED" desc="This string is the body of a promotion about signing in to NBrowser with the user's Google Account. It explains the overarching user benefit of signing in: Kids of a certain age are motivated to get their parentsΓÇÖ help staying safer online, so the tone should be motivating. We want users to understand why signing in is beneficial, and click 'Continue as name' to sign in to their Google Account.">
-+          To stay safer online with your parentΓÇÖs choices, sign in to NBrowser
+-        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_BUBBLE_CHROME_SIGNIN_SUBTITLE_SUPERVISED" desc="This string is the body of a promotion about signing in to Chromium with the user's Google Account. It explains the overarching user benefit of signing in: Kids of a certain age are motivated to get their parents’ help staying safer online, so the tone should be motivating. We want users to understand why signing in is beneficial, and click 'Continue as name' to sign in to their Google Account.">
+-          To stay safer online with your parent’s choices, sign in to Chromium
++        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_BUBBLE_CHROME_SIGNIN_SUBTITLE_SUPERVISED" desc="This string is the body of a promotion about signing in to NBrowser with the user's Google Account. It explains the overarching user benefit of signing in: Kids of a certain age are motivated to get their parents’ help staying safer online, so the tone should be motivating. We want users to understand why signing in is beneficial, and click 'Continue as name' to sign in to their Google Account.">
++          To stay safer online with your parent’s choices, sign in to NBrowser
          </message>
 -        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_BUBBLE_CHROME_SIGNIN_IPH_TEXT_SIGNIN_REMINDER" desc="This string is the body text of a reminder message, which is intended to help users understand that they have been signed in to Chromium. The user previously signed in to a Google service (like Gmail or Maps), and saw the Chrome Signin Bubble intercept; when asked whether the user wanted to sign in to Chromium as well, the user selected yes. After a period of time, this reminder message appears at the top right of Chromium (pointing at the Profile Menu) to remind the user that they made this choice a while ago. This body text string comes after the 'Welcome back, USER_NAME' string. We are focusing on the benefit that user enjoys, now that they're signed in to Chromium. The tone should be welcoming.">
--          While you're signed in, you can use your passwords and more from your Google Account in Chromium. To change this, go to ΓÇ£Your account in ChromiumΓÇ¥.
+-          While you're signed in, you can use your passwords and more from your Google Account in Chromium. To change this, go to “Your account in Chromium”.
 +        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_BUBBLE_CHROME_SIGNIN_IPH_TEXT_SIGNIN_REMINDER" desc="This string is the body text of a reminder message, which is intended to help users understand that they have been signed in to NBrowser. The user previously signed in to a Google service (like Gmail or Maps), and saw the Chrome Signin Bubble intercept; when asked whether the user wanted to sign in to NBrowser as well, the user selected yes. After a period of time, this reminder message appears at the top right of NBrowser (pointing at the Profile Menu) to remind the user that they made this choice a while ago. This body text string comes after the 'Welcome back, USER_NAME' string. We are focusing on the benefit that user enjoys, now that they're signed in to NBrowser. The tone should be welcoming.">
-+          While you're signed in, you can use your passwords and more from your Google Account in NBrowser. To change this, go to ΓÇ£Your account in NBrowserΓÇ¥.
++          While you're signed in, you can use your passwords and more from your Google Account in NBrowser. To change this, go to “Your account in NBrowser”.
          </message>
          <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_BUBBLE_CHROME_SIGNIN_IPH_TEXT_SIGNIN_REMINDER_SCREENREADER" desc="This string is the accessibility text of a reminder message, which is intended to help users understand that they have been signed in to Chrome.">
 -          While you're signed in, you can use your passwords and more from your Google Account in Chromium. <ph name="SHORTCUT">$1<ex>CTRL+SHIFT+M</ex></ph> can change your Google services settings.
@@ -1287,18 +1287,18 @@ index 12a62d6803..1d69087e6a 100644
 +        <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_NO_UNSYNCED_DATA_BODY" desc="This is the subtitle of a confirmation dialog that asks the user to confirm that they want to sign out of NBrowser. It appears when the user opens the NBrowser Profile Menu and chooses 'Sign out of NBrowser'. This subtitle is after the 'Sign out of NBrowser?' string. The tone should be calm, because we want to explain to the user that their data is saved; however, we want to set expectations by clarifying that the data will be removed from the device. This string provides a path to resolution because it explains how the user can see their data again (by signing back in).">
 +          Your passwords and other NBrowser data that you saved in your Google Account will be removed from this device. To use them again in NBrowser, sign back in.
          </message>
--        <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_VERIFY_BODY" desc="This is the subtitle of an error message dialog that appears when the user opens the Chromium Profile Menu and chooses 'Sign out of Chromium'. The error message appears when the user has saved some data (like a password or payment method) to Chromium, but Chromium wasn't able to save the data to the user's Google Account due to a sign-in error; we want to set expectations by clarifying that the data will be removed from the device. This subtitle is after the 'Some data isnΓÇÖt saved yet' string. The tone should be cautionary, because we want to explain to the user that their data is not saved and will be deleted if they sign out. This string provides a path to resolution because it explains how the user can properly save their data before they sign out of Chromium.">
--          Chromium needs to verify itΓÇÖs you before some data can be saved in your Google Account and used on all your devices. If you sign out now, this data will be deleted.
-+        <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_VERIFY_BODY" desc="This is the subtitle of an error message dialog that appears when the user opens the NBrowser Profile Menu and chooses 'Sign out of NBrowser'. The error message appears when the user has saved some data (like a password or payment method) to NBrowser, but NBrowser wasn't able to save the data to the user's Google Account due to a sign-in error; we want to set expectations by clarifying that the data will be removed from the device. This subtitle is after the 'Some data isnΓÇÖt saved yet' string. The tone should be cautionary, because we want to explain to the user that their data is not saved and will be deleted if they sign out. This string provides a path to resolution because it explains how the user can properly save their data before they sign out of NBrowser.">
-+          NBrowser needs to verify itΓÇÖs you before some data can be saved in your Google Account and used on all your devices. If you sign out now, this data will be deleted.
+-        <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_VERIFY_BODY" desc="This is the subtitle of an error message dialog that appears when the user opens the Chromium Profile Menu and chooses 'Sign out of Chromium'. The error message appears when the user has saved some data (like a password or payment method) to Chromium, but Chromium wasn't able to save the data to the user's Google Account due to a sign-in error; we want to set expectations by clarifying that the data will be removed from the device. This subtitle is after the 'Some data isn’t saved yet' string. The tone should be cautionary, because we want to explain to the user that their data is not saved and will be deleted if they sign out. This string provides a path to resolution because it explains how the user can properly save their data before they sign out of Chromium.">
+-          Chromium needs to verify it’s you before some data can be saved in your Google Account and used on all your devices. If you sign out now, this data will be deleted.
++        <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_VERIFY_BODY" desc="This is the subtitle of an error message dialog that appears when the user opens the NBrowser Profile Menu and chooses 'Sign out of NBrowser'. The error message appears when the user has saved some data (like a password or payment method) to NBrowser, but NBrowser wasn't able to save the data to the user's Google Account due to a sign-in error; we want to set expectations by clarifying that the data will be removed from the device. This subtitle is after the 'Some data isn’t saved yet' string. The tone should be cautionary, because we want to explain to the user that their data is not saved and will be deleted if they sign out. This string provides a path to resolution because it explains how the user can properly save their data before they sign out of NBrowser.">
++          NBrowser needs to verify it’s you before some data can be saved in your Google Account and used on all your devices. If you sign out now, this data will be deleted.
          </message>
--        <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_VERIFY_BODY_WITH_COUNT" desc="This is the subtitle of an error message dialog that appears when the user opens the Chromium Profile Menu and chooses 'Sign out of Chromium'. The error message appears when the user has saved some data (like a password or payment method) to Chromium, but Chromium wasn't able to save the data to the user's Google Account due to a sign-in error; we want to set expectations by clarifying that the data will be removed from the device. This subtitle is after the 'Some data isnΓÇÖt saved yet' string. The tone should be cautionary, because we want to explain to the user that their data is not saved and will be deleted if they sign out. This string provides a path to resolution because it explains how the user can properly save their data before they sign out of Chromium.">
-+        <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_VERIFY_BODY_WITH_COUNT" desc="This is the subtitle of an error message dialog that appears when the user opens the NBrowser Profile Menu and chooses 'Sign out of NBrowser'. The error message appears when the user has saved some data (like a password or payment method) to NBrowser, but NBrowser wasn't able to save the data to the user's Google Account due to a sign-in error; we want to set expectations by clarifying that the data will be removed from the device. This subtitle is after the 'Some data isnΓÇÖt saved yet' string. The tone should be cautionary, because we want to explain to the user that their data is not saved and will be deleted if they sign out. This string provides a path to resolution because it explains how the user can properly save their data before they sign out of NBrowser.">
+-        <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_VERIFY_BODY_WITH_COUNT" desc="This is the subtitle of an error message dialog that appears when the user opens the Chromium Profile Menu and chooses 'Sign out of Chromium'. The error message appears when the user has saved some data (like a password or payment method) to Chromium, but Chromium wasn't able to save the data to the user's Google Account due to a sign-in error; we want to set expectations by clarifying that the data will be removed from the device. This subtitle is after the 'Some data isn’t saved yet' string. The tone should be cautionary, because we want to explain to the user that their data is not saved and will be deleted if they sign out. This string provides a path to resolution because it explains how the user can properly save their data before they sign out of Chromium.">
++        <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_VERIFY_BODY_WITH_COUNT" desc="This is the subtitle of an error message dialog that appears when the user opens the NBrowser Profile Menu and chooses 'Sign out of NBrowser'. The error message appears when the user has saved some data (like a password or payment method) to NBrowser, but NBrowser wasn't able to save the data to the user's Google Account due to a sign-in error; we want to set expectations by clarifying that the data will be removed from the device. This subtitle is after the 'Some data isn’t saved yet' string. The tone should be cautionary, because we want to explain to the user that their data is not saved and will be deleted if they sign out. This string provides a path to resolution because it explains how the user can properly save their data before they sign out of NBrowser.">
            {count, plural,
--              =1 {Chromium needs to verify itΓÇÖs you before some data can be saved in your Google Account and used on all your devices. If you sign out now, this data (1 item) will be deleted.}
--              other {Chromium needs to verify itΓÇÖs you before some data can be saved in your Google Account and used on all your devices. If you sign out now, this data ({count} items) will be deleted.}}
-+              =1 {NBrowser needs to verify itΓÇÖs you before some data can be saved in your Google Account and used on all your devices. If you sign out now, this data (1 item) will be deleted.}
-+              other {NBrowser needs to verify itΓÇÖs you before some data can be saved in your Google Account and used on all your devices. If you sign out now, this data ({count} items) will be deleted.}}
+-              =1 {Chromium needs to verify it’s you before some data can be saved in your Google Account and used on all your devices. If you sign out now, this data (1 item) will be deleted.}
+-              other {Chromium needs to verify it’s you before some data can be saved in your Google Account and used on all your devices. If you sign out now, this data ({count} items) will be deleted.}}
++              =1 {NBrowser needs to verify it’s you before some data can be saved in your Google Account and used on all your devices. If you sign out now, this data (1 item) will be deleted.}
++              other {NBrowser needs to verify it’s you before some data can be saved in your Google Account and used on all your devices. If you sign out now, this data ({count} items) will be deleted.}}
          </message>
 -        <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_UNSYNCED_BODY"  desc="This is the subtitle of an error message dialog that appears when the user opens the Chromium Profile Menu and chooses 'Sign out of Chromium'. The error message appears when the user tries to sign out immediately after having saved saved some data (like a password or payment method) to Chromium and Chromium hasn't had time to save that data to the user's Google Account yet. This subtitle is after the 'Some data isn't saved yet' string. The tone should be cautionary, because we want to explain to the user that their data is not saved to their Google Account. This string asks the user to wait a few minutes before trying to sign out again.">
 -          Some of your Chromium data hasn't been saved in your Google Account yet. Try waiting a few minutes before signing out. If you sign out now, this data will be deleted.
@@ -1314,8 +1314,8 @@ index 12a62d6803..1d69087e6a 100644
 +              other {Some of your NBrowser data hasn't been saved in your Google Account yet. Try waiting a few minutes before signing out. If you sign out now, this data ({count} items) will be deleted.}}
          </message>
          <message name="IDS_CLOSE_WARNING_FOR_CLEAR_COOKIES_ON_EXIT_TEXT" desc="Body of a notice displayed when closing the last Chrome window, to inform the user about a change in the way the 'Clear cookie on exit' setting works.">
--          YouΓÇÖll be signed out of most sites when you close all Chromium windows, except your Google Account if youΓÇÖre signed in to Chromium. To let sites remember you, <ph name="SETTINGS_LINK">$1<ex>go to settings</ex></ph>.
-+          YouΓÇÖll be signed out of most sites when you close all NBrowser windows, except your Google Account if youΓÇÖre signed in to NBrowser. To let sites remember you, <ph name="SETTINGS_LINK">$1<ex>go to settings</ex></ph>.
+-          You’ll be signed out of most sites when you close all Chromium windows, except your Google Account if you’re signed in to Chromium. To let sites remember you, <ph name="SETTINGS_LINK">$1<ex>go to settings</ex></ph>.
++          You’ll be signed out of most sites when you close all NBrowser windows, except your Google Account if you’re signed in to NBrowser. To let sites remember you, <ph name="SETTINGS_LINK">$1<ex>go to settings</ex></ph>.
          </message>
          <message name="IDS_AVATAR_BUTTON_INTERCEPT_BUBBLE_CHROME_SIGNIN_ACCESSIBILITY_LABEL"
 -          desc="Accessibility label (read by the accessibility tools) of the avatar button when the Chromium Signin bubble is shown. The text implies that the expanded bubble underneath the button is closable by clicking on the button. The actual text is 'Sign in to Chromium?' with a bubble shown under it.">
@@ -1604,7 +1604,7 @@ index 12a62d6803..1d69087e6a 100644
 +          Click the NBrowser menu
          </message>
          <message name="IDS_TUTORIAL_PASSWORD_MANAGER_CLICK_PASSWORD_MANAGER" desc="The description of the 'click password manager' step in password manager tutorial">
-           Click ΓÇ£Password ManagerΓÇ¥
+           Click “Password Manager”
 @@ -1657,94 +1657,94 @@ Chromium is unable to recover your settings.
  
        <!-- Settings API bubble -->
@@ -1665,14 +1665,14 @@ index 12a62d6803..1d69087e6a 100644
  
        <if expr="not is_android">
 -        <message name="IDS_CONTENT_CONTEXT_ACCESSIBILITY_LABELS_BUBBLE_TEXT" desc="The text of a bubble that confirms users allows integrating the accessibility labels service of Google to Chromium.">
--          If an image doesnΓÇÖt have a useful description, Chromium will try to provide one for you. To create descriptions, images are sent to Google. You can turn this off in settings at any time.
+-          If an image doesn’t have a useful description, Chromium will try to provide one for you. To create descriptions, images are sent to Google. You can turn this off in settings at any time.
 +        <message name="IDS_CONTENT_CONTEXT_ACCESSIBILITY_LABELS_BUBBLE_TEXT" desc="The text of a bubble that confirms users allows integrating the accessibility labels service of Google to NBrowser.">
-+          If an image doesnΓÇÖt have a useful description, NBrowser will try to provide one for you. To create descriptions, images are sent to Google. You can turn this off in settings at any time.
++          If an image doesn’t have a useful description, NBrowser will try to provide one for you. To create descriptions, images are sent to Google. You can turn this off in settings at any time.
          </message>
 -        <message name="IDS_CONTENT_CONTEXT_ACCESSIBILITY_LABELS_BUBBLE_TEXT_ONCE" desc="The text of a bubble that confirms users allows integrating the accessibility labels service of Google to Chromium just once.">
--          If an image doesnΓÇÖt have a useful description, Chromium will try to provide one for you. To create descriptions, images are sent to Google.
+-          If an image doesn’t have a useful description, Chromium will try to provide one for you. To create descriptions, images are sent to Google.
 +        <message name="IDS_CONTENT_CONTEXT_ACCESSIBILITY_LABELS_BUBBLE_TEXT_ONCE" desc="The text of a bubble that confirms users allows integrating the accessibility labels service of Google to NBrowser just once.">
-+          If an image doesnΓÇÖt have a useful description, NBrowser will try to provide one for you. To create descriptions, images are sent to Google.
++          If an image doesn’t have a useful description, NBrowser will try to provide one for you. To create descriptions, images are sent to Google.
          </message>
          <message name="IDS_CONTENT_CONTEXT_SPELLING_BUBBLE_TEXT" desc="The text of a bubble that confirms users allows integrating the spelling service of Google to Chrome.">
            This uses the same spell checker that's used in Google search. Text you type in the browser is sent to Google. You can always change this behavior in settings.
@@ -2711,8 +2711,8 @@ index 12a62d6803..1d69087e6a 100644
  
        <!-- Glic button and tab strip context menu -->
        <message name="IDS_GLIC_CONTEXTUAL_CUEING_ANNOUNCEMENT" desc="Polite announcement that happens when a contextual nudge is shown next to the Glic button." translateable="false">
--        To open Gemini in Chromium, press <ph name="GLOBAL_HOTKEY">$1<ex>Γîÿ+G</ex></ph>
-+        To open Gemini in NBrowser, press <ph name="GLOBAL_HOTKEY">$1<ex>Γîÿ+G</ex></ph>
+-        To open Gemini in Chromium, press <ph name="GLOBAL_HOTKEY">$1<ex>⌘+G</ex></ph>
++        To open Gemini in NBrowser, press <ph name="GLOBAL_HOTKEY">$1<ex>⌘+G</ex></ph>
        </message>
  
        <!-- UNO Promo strings for extensions -->
@@ -2832,16 +2832,16 @@ index 12a62d6803..1d69087e6a 100644
 +          Get price tracking alerts with NBrowser on your phone
          </message>
          <message name="IDS_IOS_DESKTOP_PRICE_TRACKING_REMINDER_CONFIRMATION" desc="Body text of the promo bubble that appears after the user chooses to be reminded of price tracking on their iOS device.">
--          Next time you open Chromium on your <ph name="DEVICE_TYPE">$1<ex>iPhone</ex></ph>, youΓÇÖll see a prompt to enable price tracking alerts.
-+          Next time you open NBrowser on your <ph name="DEVICE_TYPE">$1<ex>iPhone</ex></ph>, youΓÇÖll see a prompt to enable price tracking alerts.
+-          Next time you open Chromium on your <ph name="DEVICE_TYPE">$1<ex>iPhone</ex></ph>, you’ll see a prompt to enable price tracking alerts.
++          Next time you open NBrowser on your <ph name="DEVICE_TYPE">$1<ex>iPhone</ex></ph>, you’ll see a prompt to enable price tracking alerts.
          </message>
          <message name="IDS_IOS_DESKTOP_TAB_GROUPS_PROMO_BUBBLE_DESCRIPTION_QR" desc="The description for the iOS desktop Tab Groups promo bubble with a QR code.">
 -          Download Chromium on your phone to open or create new tab groups on the go.
 +          Download NBrowser on your phone to open or create new tab groups on the go.
          </message>
          <message name="IDS_IOS_DESKTOP_TAB_GROUPS_REMINDER_CONFIRMATION" desc="Body text of the promo bubble that appears after the user chooses to be reminded of tab groups on their iOS device.">
--          Next time you open Chromium on your <ph name="DEVICE_TYPE">$1<ex>iPhone</ex></ph>, youΓÇÖll see a prompt to use tab groups.
-+          Next time you open NBrowser on your <ph name="DEVICE_TYPE">$1<ex>iPhone</ex></ph>, youΓÇÖll see a prompt to use tab groups.
+-          Next time you open Chromium on your <ph name="DEVICE_TYPE">$1<ex>iPhone</ex></ph>, you’ll see a prompt to use tab groups.
++          Next time you open NBrowser on your <ph name="DEVICE_TYPE">$1<ex>iPhone</ex></ph>, you’ll see a prompt to use tab groups.
          </message>
          <message name="IDS_IOS_DESKTOP_AI_PROMO_BUBBLE_DESCRIPTION_QR" desc="The description for the iOS desktop AI promo bubble with a QR code.">
 -          Scan the QR code with your phone to download Chromium and sign in to your Google Account.
@@ -2895,8 +2895,8 @@ index 12a62d6803..1d69087e6a 100644
 +          Get Google's best safety features on the go, with the NBrowser app on your phone
          </message>
          <message name="IDS_IOS_DESKTOP_SAFETY_PROMO_BUBBLE_DESCRIPTION_REMINDER" desc="The description for the iOS desktop Safety promo bubble with a reminder.">
--          Get GoogleΓÇÖs best safety features on the go with Chromium.
-+          Get GoogleΓÇÖs best safety features on the go with NBrowser.
+-          Get Google’s best safety features on the go with Chromium.
++          Get Google’s best safety features on the go with NBrowser.
          </message>
          <message name="IDS_IOS_DESKTOP_SAFETY_PROMO_BUBBLE_TITLE_REMINDER" desc="The title for the iOS desktop Safety promo bubble with a reminder.">
 -          Take the safety of Google on the go with the Chromium app on your <ph name="DEVICE_TYPE">$1<ex>iPhone</ex></ph>
@@ -2907,7 +2907,7 @@ index 12a62d6803..1d69087e6a 100644
 +          Use the NBrowser app to take the safety of Google on the go
          </message>
          <message name="IDS_IOS_DESKTOP_SAFETY_PROMO_NOTIFICATION_TITLE" desc="The title for the iOS desktop Safety promo notification.">
-           Reminder: GoogleΓÇÖs best safety features in your pocket
+           Reminder: Google’s best safety features in your pocket
          </message>
          <message name="IDS_IOS_DESKTOP_SHOPPING_PROMO_BUBBLE_DESCRIPTION_QR" desc="The description for the iOS desktop Shopping promo bubble with a QR code.">
 -          Scan the QR code with your phone to download Chromium and sign in to your Google Account.
@@ -2984,7 +2984,7 @@ index 12a62d6803..1d69087e6a 100644
        <message name="IDS_JS_OPTIMIZATION_BUBBLE_BODY_NON_POLICY_BODY" desc="Body text for the JavaScript optimization bubble when disabled for other reasons.">
 -        For security, Chromium turns off JavaScript optimization when you visit a site for the first time.&#xA;
 +        For security, NBrowser turns off JavaScript optimization when you visit a site for the first time.&#xA;
- If this page isnΓÇÖt working as expected, try allowing optimization.
+ If this page isn’t working as expected, try allowing optimization.
        </message>
        <!-- Send Tab To Self -->
        <message name="IDS_SEND_TAB_TO_SELF_SIGN_IN_PROMO_TITLE" desc="Title of the send-tab-to-self sign-in promo bubble.">

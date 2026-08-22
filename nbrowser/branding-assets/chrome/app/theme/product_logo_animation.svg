@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <clipPath id="nb-clip">
+      <rect x="0" y="0" width="256" height="256" />
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#nb-clip)">
+
+    <!-- Base white disc, static, always present under everything -->
+    <circle cx="128" cy="128" r="122" fill="white" stroke="black" stroke-width="4" opacity="1" />
+
+    <!-- SPOKES: three black lines, fly/rotate in from a scattered state -->
+    <g id="spokes" opacity="0">
+      <g style="mix-blend-mode:normal">
+        <path fill="none" stroke="#000000" stroke-width="24" stroke-linecap="round"
+              d="M175.893 148L117.292 249.5" />
+      </g>
+      <g style="mix-blend-mode:normal">
+        <path fill="none" stroke="#000000" stroke-width="24" stroke-linecap="round"
+              d="M74.4451 131.148L49.0844 36.5" />
+      </g>
+      <g style="mix-blend-mode:normal">
+        <path fill="none" stroke="#000000" stroke-width="24" stroke-linecap="round"
+              d="M128 75.541H237.5" />
+      </g>
+    </g>
+
+    <!-- CENTER RING: pops in with a spring/overshoot, like the Chromium "c" group -->
+    <g id="center" opacity="0">
+      <circle cx="126.942" cy="128" r="52.6758" fill="white" stroke="#000000" stroke-width="24" />
+    </g>
+
+    <!-- Thin outer ring, appears together with center -->
+    <g id="outerring" opacity="0">
+      <circle cx="128" cy="128" r="122" fill="none" stroke="#000000" stroke-width="6" />
+    </g>
+
+  </g>
+
+  <!-- SPOKES animation: rotate in from -120deg + scaled down + faded, settle to identity -->
+  <animateTransform href="#spokes" attributeName="transform" additive="sum" fill="freeze"
+    calcMode="spline" dur="1s" repeatCount="1"
+    keyTimes="0;0.5;1" keySplines="0.5 0.35 0.15 1;0.5 0.35 0.15 1"
+    type="rotate" values="-120 128 128;-120 128 128;0 128 128" />
+  <animateTransform href="#spokes" attributeName="transform" additive="sum" fill="freeze"
+    calcMode="spline" dur="1s" repeatCount="1"
+    keyTimes="0;0.5;1" keySplines="0.5 0.35 0.15 1;0.5 0.35 0.15 1"
+    type="translate" values="128 128;128 128;128 128" />
+  <animateTransform href="#spokes" attributeName="transform" additive="sum" fill="freeze"
+    calcMode="spline" dur="1s" repeatCount="1"
+    keyTimes="0;0.5;1" keySplines="0.5 0.35 0.15 1;0.5 0.35 0.15 1"
+    type="scale" values="0.55 0.55;0.55 0.55;1 1" />
+  <animateTransform href="#spokes" attributeName="transform" additive="sum" fill="freeze"
+    calcMode="spline" dur="1s" repeatCount="1"
+    keyTimes="0;0.5;1" keySplines="0.5 0.35 0.15 1;0.5 0.35 0.15 1"
+    type="translate" values="-128 -128;-128 -128;-128 -128" />
+  <animate href="#spokes" attributeName="opacity" fill="freeze"
+    calcMode="spline" dur="1s" repeatCount="1"
+    keyTimes="0;0.5;1" keySplines="0.5 0.35 0.15 1;0.5 0.35 0.15 1"
+    values="0;0;1" />
+
+  <!-- CENTER animation: spring/overshoot scale-in (0.3 -> 1.25 -> 1), fades in immediately -->
+  <animateTransform href="#center" attributeName="transform" additive="sum" fill="freeze"
+    calcMode="spline" dur="1s" repeatCount="1"
+    keyTimes="0;0.5;1" keySplines="0.5 0.35 0.15 1;0.5 0.35 0.15 1"
+    type="translate" values="126.942 128;126.942 128;126.942 128" />
+  <animateTransform href="#center" attributeName="transform" additive="sum" fill="freeze"
+    calcMode="spline" dur="1s" repeatCount="1"
+    keyTimes="0;0.5;1" keySplines="0.5 0.35 0.15 1;0.5 0.35 0.15 1"
+    type="scale" values="0.3 0.3;1.25 1.25;1 1" />
+  <animateTransform href="#center" attributeName="transform" additive="sum" fill="freeze"
+    calcMode="spline" dur="1s" repeatCount="1"
+    keyTimes="0;0.5;1" keySplines="0.5 0.35 0.15 1;0.5 0.35 0.15 1"
+    type="translate" values="-126.942 -128;-126.942 -128;-126.942 -128" />
+  <animate href="#center" attributeName="opacity" fill="freeze"
+    calcMode="spline" dur="1s" repeatCount="1"
+    keyTimes="0;0.5;1" keySplines="0.5 0.35 0.15 1;0.5 0.35 0.15 1"
+    values="0;1;1" />
+
+  <!-- Outer ring: simple fade-in, settles alongside center -->
+  <animate href="#outerring" attributeName="opacity" fill="freeze"
+    calcMode="spline" dur="1s" repeatCount="1"
+    keyTimes="0;0.6;1" keySplines="0.5 0.35 0.15 1;0.5 0.35 0.15 1"
+    values="0;0.2;1" />
+
+</svg>
