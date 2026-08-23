@@ -62,7 +62,7 @@ def main():
     build_outputs = Path('build/src/out/Default')
 
     shutil.copyfile('build/src/out/Default/mini_installer.exe',
-        'build/ungoogled-chromium_{}-{}.{}_installer_{}.exe'.format(
+        'build/nbrowser_{}-{}.{}_installer_{}.exe'.format(
             get_chromium_version(), _get_release_revision(),
             _get_packaging_revision(), _get_target_cpu(build_outputs)))
 
@@ -73,7 +73,7 @@ def main():
     except FileNotFoundError:
         pass
 
-    output = Path('build/ungoogled-chromium_{}-{}.{}_windows_{}.zip'.format(
+    output = Path('build/nbrowser_{}-{}.{}_windows_{}.zip'.format(
         get_chromium_version(), _get_release_revision(),
         _get_packaging_revision(), _get_target_cpu(build_outputs)))
 
@@ -86,8 +86,14 @@ def main():
     files_generator = filescfg.filescfg_generator(
         Path('build/src/chrome/tools/build/win/FILES.cfg'),
         build_outputs, args.cpu_arch, excluded_files)
+    """
+    !!Credit to Aerium Browser!!
+    https://github.com/aerium-browser/aerium-browser-windows
+    """
+    extensions_dir = build_outputs / 'Extensions'
+    include_paths = (extensions_dir,) if extensions_dir.exists() else tuple()
     filescfg.create_archive(
-        files_generator, tuple(), build_outputs, output, timestamp)
+        files_generator, include_paths, build_outputs, output, timestamp)
 
 if __name__ == '__main__':
     main()

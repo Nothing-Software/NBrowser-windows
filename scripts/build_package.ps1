@@ -1,9 +1,12 @@
-# Installer build: applies branding assets, then builds mini_installer.
+# Package build + applies branding assets
 
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 & (Join-Path $PSScriptRoot "apply_branding_assets.ps1")
-Set-Location (Join-Path $root "build\src")
 $env:DEPOT_TOOLS_WIN_TOOLCHAIN = "0"
 git checkout -- third_party/win_build_output 2>$null
-.\third_party\ninja\ninja.exe -C out\Default mini_installer
+python3 package.py
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "build.py failed (exit code $LASTEXITCODE). Skipping icon overlay."
+    exit $LASTEXITCODE
+}

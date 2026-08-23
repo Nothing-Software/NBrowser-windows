@@ -29,6 +29,46 @@ sys.path.pop(0)
 _ROOT_DIR = Path(__file__).resolve().parent
 _PATCH_BIN_RELPATH = Path('third_party/git/usr/bin/patch.exe')
 
+_CWS_ID = 'ocaahdebbfolfmndjeplogmgcagdmblk'
+_CWS_VERSION = '1.5.5.3'
+_CWS_URL = ('https://github.com/NeverDecaf/chromium-web-store/releases/download/'
+            'v{}/Chromium.Web.Store.crx'.format(_CWS_VERSION))
+_CWS_SHA256 = '326443baec3d204b1358eba6aa025cf6bd930c08a0b98f6784e7a3236528445b'
+
+"""
+!!Credit to Aerium Browser!!
+https://github.com/aerium-browser/aerium-browser-windows
+"""
+def _stage_bundled_extensions(source_tree):
+    import hashlib
+    import json
+    import urllib.request
+    ext_dir = source_tree / 'out' / 'Default' / 'Extensions'
+    ext_dir.mkdir(parents=True, exist_ok=True)
+    crx_path = ext_dir / 'chromium_web_store.crx'
+    if not crx_path.exists():
+        get_logger().info('Downloading Chromium Web Store extension...')
+        with urllib.request.urlopen(_CWS_URL) as response:
+            data = response.read()
+        if hashlib.sha256(data).hexdigest() != _CWS_SHA256:
+            raise RuntimeError('Chromium Web Store crx checksum mismatch')
+        crx_path.write_bytes(data)
+    manifest = json.dumps(
+        {
+            _CWS_ID: {
+                'external_crx': crx_path.name,
+                'external_version': _CWS_VERSION,
+            }
+        }, indent=2)
+    json_src = (source_tree / 'chrome' / 'browser' / 'extensions' /
+                'default_extensions' / 'external_extensions.json')
+    if not json_src.exists():
+        raise RuntimeError(
+            'default_extensions/external_extensions.json not found - upstream '
+            'moved it, update _stage_bundled_extensions to match')
+    if json_src.read_text(encoding=ENCODING) != manifest:
+        json_src.write_text(manifest, encoding=ENCODING)
+
 
 def _get_vcvars_path(name='64'):
     """
@@ -287,6 +327,8 @@ def main():
         gn_flags += windows_flags
         (source_tree / 'out/Default/args.gn').write_text(gn_flags, encoding=ENCODING)
 
+
+    _stage_bundled_extensions(source_tree)
     # Enter source tree to run build commands
     os.chdir(source_tree)
 
@@ -321,7 +363,7 @@ def main():
         _run_build_process_timeout(*ninja_commandline, timeout=3.5*60*60)
         # package
         os.chdir(_ROOT_DIR)
-        subprocess.run([sys.executable, 'package.py', '--cpu-arch', '32bit' if args.x86 else 'arm' if args.arm else '64bit'])
+        subprocess.run([sys.executable, 'package.py', '--cpu-arch', '32bit' if args.x86 else 'arm' if args.arm else '64bit'], check=True)
     else:
         _run_build_process(*ninja_commandline)
 
