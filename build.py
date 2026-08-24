@@ -34,6 +34,8 @@ _CWS_VERSION = '1.5.5.3'
 _CWS_URL = ('https://github.com/NeverDecaf/chromium-web-store/releases/download/'
             'v{}/Chromium.Web.Store.crx'.format(_CWS_VERSION))
 _CWS_SHA256 = '326443baec3d204b1358eba6aa025cf6bd930c08a0b98f6784e7a3236528445b'
+_BRAND_NAME = 'NBrowser'
+_COMPANY_NAME = 'NothingSoftware'
 
 """
 !!Credit to Aerium Browser!!
@@ -69,6 +71,67 @@ def _stage_bundled_extensions(source_tree):
     if json_src.read_text(encoding=ENCODING) != manifest:
         json_src.write_text(manifest, encoding=ENCODING)
 
+"""
+!!Credit to Aerium Browser!!
+https://github.com/aerium-browser/aerium-browser-windows
+"""
+def _apply_branding(source_tree):
+    get_logger().info('Applying %s branding...', _BRAND_NAME)
+ 
+    # 1. Mirror-copy binary assets (icons, logos) from branding-assets/
+    assets_dir = _ROOT_DIR / 'nbrowser' / 'branding-assets'
+    if assets_dir.exists():
+        copied = 0
+        for src_path in assets_dir.rglob('*'):
+            if not src_path.is_file():
+                continue
+            rel = src_path.relative_to(assets_dir)
+            dst_path = source_tree / rel
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src_path, dst_path)
+            copied += 1
+        get_logger().info('Copied %d branding asset files', copied)
+ 
+    # 2. Rewrite BRANDING file
+    branding_path = source_tree / 'chrome' / 'app' / 'theme' / 'chromium' / 'BRANDING'
+    if branding_path.exists():
+        branding_lines = []
+        for line in branding_path.read_text(encoding=ENCODING).splitlines():
+            if line.startswith('PRODUCT_'):
+                line = line.replace('Chromium', _BRAND_NAME)
+            elif line.startswith('COMPANY_FULLNAME=') or line.startswith('COMPANY_SHORTNAME='):
+                line = line.split('=', 1)[0] + '=' + _COMPANY_NAME
+            elif line.startswith('COPYRIGHT='):
+                line = ('COPYRIGHT=Copyright @LASTCHANGE_YEAR@ {}. '
+                        'All rights reserved.'.format(_COMPANY_NAME))
+            branding_lines.append(line)
+        branding_path.write_text('\n'.join(branding_lines) + '\n', encoding=ENCODING)
+ 
+    # 3. Sweep .grd/.grdp/.xtb strings
+    string_roots = ('chrome', 'components', 'extensions', 'ui', 'content')
+    string_suffixes = ('.grd', '.grdp', '.xtb')
+    replaced_count = 0
+    for root in string_roots:
+        root_path = source_tree / root
+        if not root_path.exists():
+            continue
+        for path in root_path.rglob('*'):
+            if path.suffix not in string_suffixes or not path.is_file():
+                continue
+            try:
+                text = path.read_text(encoding='utf-8')
+            except (UnicodeDecodeError, OSError):
+                continue
+            if 'Chromium' not in text and 'ungoogled-chromium' not in text:
+                continue
+            new_text = text.replace('The Chromium Authors', _COMPANY_NAME)
+            new_text = new_text.replace('Chromium', _BRAND_NAME)
+            new_text = new_text.replace(
+                'ungoogled-chromium', '{} by {}'.format(_BRAND_NAME, _COMPANY_NAME))
+            if new_text != text:
+                path.write_text(new_text, encoding='utf-8')
+                replaced_count += 1
+    get_logger().info('Renamed product in %d string files', replaced_count)
 
 def _get_vcvars_path(name='64'):
     """
@@ -275,6 +338,7 @@ def main():
             source_tree,
             None
         )
+        _apply_branding(source_tree)
 
     # Check if rust-toolchain folder has been populated
     HOST_CPU_IS_64BIT = sys.maxsize > 2**32
