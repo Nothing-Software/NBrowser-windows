@@ -25,3 +25,5 @@ nbrowser/windows/windows-nbrowser-identity.patch
 nbrowser/windows/windows-nbrowser-increment-icon-version.patch
 nbrowser/windows/windows-nbrowser-external-extensions.patch
 nbrowser/windows/windows-nbrowser-default-flags.patch
+nbrowser/windows/windows-nbrowser-first-run-locale-wiring.patch
+nbrowser/windows/windows-nbrowser-first-run-url.patch

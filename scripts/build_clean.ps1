@@ -13,4 +13,4 @@ if ($LASTEXITCODE -ne 0) {
 }
  
 Write-Output "== Done: clean build =="
-Write-Output "Run build_installer.ps1 next if you need mini_installer.exe / the packaged installer."
+Write-Output "Run build_package.ps1 next if you need mini_installer.exe / the packaged installer."

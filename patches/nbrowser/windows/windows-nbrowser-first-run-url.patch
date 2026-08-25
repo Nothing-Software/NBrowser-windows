@@ -1,0 +1,24 @@
+diff --git a/chrome/browser/chrome_browser_main.cc b/chrome/browser/chrome_browser_main.cc
+index a32949ed04..34c44f753b 100644
+--- a/chrome/browser/chrome_browser_main.cc
++++ b/chrome/browser/chrome_browser_main.cc
+@@ -1277,6 +1277,7 @@ int ChromeBrowserMainParts::PreCreateThreadsImpl() {
+   if (first_run::IsChromeFirstRun()) {
+     if (!base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kApp) &&
+         !base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kAppId)) {
++      browser_creator_->AddFirstRunTabs({GURL("chrome://nbrowser-first-run")});
+       browser_creator_->AddFirstRunTabs(master_prefs_->new_tabs);
+     }
+   }
+diff --git a/chrome/common/webui_url_constants.cc b/chrome/common/webui_url_constants.cc
+index 4c12bc6429..6c559964eb 100644
+--- a/chrome/common/webui_url_constants.cc
++++ b/chrome/common/webui_url_constants.cc
+@@ -121,6 +121,7 @@ bool IsSystemWebUIHost(std::string_view host) {
+ // These hosts will also be suggested by BuiltinProvider.
+ base::span<const base::cstring_view> ChromeURLHosts() {
+   static constexpr auto kChromeURLHosts = std::to_array<base::cstring_view>({
++      "nbrowser-first-run",
+       kChromeUIAboutHost,
+       kChromeUIAccessibilityHost,
+       kChromeUIActorInternalsHost,

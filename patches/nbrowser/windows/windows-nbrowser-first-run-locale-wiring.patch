@@ -1,0 +1,41 @@
+diff --git a/chrome/browser/ui/webui/BUILD.gn b/chrome/browser/ui/webui/BUILD.gn
+index 9ad30f708e..6694502958 100644
+--- a/chrome/browser/ui/webui/BUILD.gn
++++ b/chrome/browser/ui/webui/BUILD.gn
+@@ -83,6 +83,7 @@ source_set("configs") {
+     "//chrome/browser/ui/webui/location_internals",
+     "//chrome/browser/ui/webui/media",
+     "//chrome/browser/ui/webui/metrics_internals",
++    "//chrome/browser/ui/webui/nbrowser_first_run:strings",
+     "//chrome/browser/ui/webui/net_internals",
+     "//chrome/browser/ui/webui/omnibox",
+     "//chrome/browser/ui/webui/personal_context_internals",
+diff --git a/chrome/chrome_repack_locales.gni b/chrome/chrome_repack_locales.gni
+index 19be5865dc..fe20a42186 100644
+--- a/chrome/chrome_repack_locales.gni
++++ b/chrome/chrome_repack_locales.gni
+@@ -108,6 +108,10 @@ template("chrome_repack_locales") {
+           [ "${root_gen_dir}/chrome/browser/indigo/resources/indigo_strings_" ]
+       deps += [ "//chrome/browser/indigo/resources:indigo_strings" ]
+     }
++    if (!is_android) {
++      source_patterns += [ "${root_gen_dir}/chrome/browser/ui/webui/nbrowser_first_run/nbrowser_first_run_strings_" ]
++      deps += [ "//chrome/browser/ui/webui/nbrowser_first_run:strings" ]
++    }
+     if (enable_builtin_search_provider_assets && !is_android) {
+       source_patterns += [ "${root_gen_dir}/third_party/search_engines_data/search_engine_descriptions_strings_" ]
+       deps += [
+diff --git a/tools/gritsettings/resource_ids.spec b/tools/gritsettings/resource_ids.spec
+index e1f3030f0c..792699ed97 100644
+--- a/tools/gritsettings/resource_ids.spec
++++ b/tools/gritsettings/resource_ids.spec
+@@ -189,6 +189,9 @@
+   "chrome/browser/indigo/resources/browser_resources.grd": {
+     "includes": [2640],
+   },
++  "chrome/browser/ui/webui/nbrowser_first_run/nbrowser_first_run_strings.grd": {
++    "messages": [2650],
++  },
+   # END chrome/browser section.
+
+   # START chrome/ WebUI resources section

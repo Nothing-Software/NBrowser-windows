@@ -3,6 +3,7 @@
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 & (Join-Path $PSScriptRoot "apply_branding_assets.ps1")
+& (Join-Path $PSScriptRoot "apply_overlay.ps1")
 
 Write-Output "== Build mini_installer =="
 Set-Location (Join-Path $root "build\src")
@@ -17,3 +18,5 @@ if ($LASTEXITCODE -ne 0) {
     Write-Error "build.py failed (exit code $LASTEXITCODE). Skipping icon overlay."
     exit $LASTEXITCODE
 }
+
+Write-Output "== Done: package builded =="
