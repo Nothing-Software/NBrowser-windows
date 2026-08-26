@@ -1,0 +1,15 @@
+--- a/chrome/browser/prefs/browser_prefs.cc
++++ b/chrome/browser/prefs/browser_prefs.cc
+@@ -1384,6 +1384,12 @@
+ }
+
+ void RegisterLocalState(PrefRegistrySimple* registry) {
++  // NBrowser first-run language screen (chrome://nbrowser-first-run) state -
++  // see ungoogled_first_run.h. Not part of the alphabetized subsystem list
++  // below since these aren't owned by a subsystem.
++  registry->RegisterBooleanPref("nbrowser.first_run_language_chosen", false);
++  registry->RegisterBooleanPref("nbrowser.first_run_pending_relaunch", false);
++
+   // Call outs to individual subsystems that register Local State (browser-wide)
+   // prefs en masse. See RegisterProfilePrefs for per-profile prefs. Please
+   // keep this list alphabetized.

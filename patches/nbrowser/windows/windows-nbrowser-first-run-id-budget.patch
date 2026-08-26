@@ -1,0 +1,11 @@
+--- a/tools/gritsettings/resource_ids.spec
++++ b/tools/gritsettings/resource_ids.spec
+@@ -198,7 +198,7 @@
+   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/about_sys/resources.grd": {
+     # Big alignment at start of section.
+     "META": {"align": 100, "sizes": {"includes": [10]}},
+-    "includes": [2700],
++    "includes": [2710],
+   },
+   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/access_code_cast/resources.grd": {
+     "META": {"sizes": {"includes": [50]}},

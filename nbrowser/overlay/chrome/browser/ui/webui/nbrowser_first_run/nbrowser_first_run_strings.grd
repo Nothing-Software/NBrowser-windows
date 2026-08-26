@@ -186,6 +186,39 @@
       <message name="IDS_NBROWSER_FIRST_RUN_FOOTER_DONATE" desc="Understated, low-visual-weight donate/support link text at the very bottom of the page.">
         If NBrowser's been useful to you, you can support its development here.
       </message>
+
+      <!-- Onboarding wizard (screens 1-5, chrome://nbrowser-first-run). Screen 6 is the
+           welcome content above, shown as the wizard's final step. -->
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_CONTINUE" desc="Button that advances to the next wizard screen. Shared by every screen.">Continue</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_BACK" desc="Button that returns to the previous wizard screen. Shared by every screen except the first.">Back</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_LANG_TITLE" desc="Static part of the heading on the wizard's language-picker screen (screen 0), next to an animated cycling word showing 'hello' in different languages.">Select language</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_LANG_RESTART" desc="Button on the language-picker screen that applies the chosen language and restarts the browser.">Restart</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_WELCOME_TITLE" desc="Heading on the wizard's first (welcome) screen.">Hi! Let's set things up to your taste?</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_WELCOME_SUBTITLE" desc="Subtext under the welcome heading on the wizard's first screen.">A few steps, and the browser will work the way that suits you.</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_TRANSLATE_TITLE" desc="Heading on the translator/captions wizard screen (only shown for Russian-language users).">Want to turn on the translator and captions?</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_TRANSLATE_INTRO" desc="Intro line before the bulleted list of translator improvements.">We've expanded the translator. What's new:</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_TRANSLATE_BULLET_IMPROVED" desc="First bullet describing a translator improvement.">Improved page translation</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_TRANSLATE_BULLET_CONTEXT_MENU" desc="Second bullet describing a translator improvement (right-click to translate a selection).">Select text and right-click to see an instant translation of the selection</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_TRANSLATE_BULLET_APPLY" desc="Third bullet describing a translator improvement (apply translation in place).">Select text and choose Translate to apply the translation on the page</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_TRANSLATE_NOTICE" desc="Warning note on the translator screen about requests going to Google Translate.">Important! The translator and captions send requests to Google Translate to translate text — it's up to you whether to turn them on.</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_TRANSLATE_ENHANCED_LABEL" desc="Label of the 'enhanced translator' toggle. This feature is not implemented yet, so the toggle is visual only.">Enhanced translator</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_TRANSLATE_ENHANCED_HINT" desc="Small parenthetical hint under the enhanced translator toggle.">(sent to Google Translate for translation)</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_TRANSLATE_AUTO_LABEL" desc="Label of the auto-translate-pages toggle, nested under the enhanced translator toggle. Enabling it always-translates English pages to Russian and never prompts to translate Russian pages.">Automatically translate pages?</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_TRANSLATE_CAPTIONS_LABEL" desc="Label of the 'automatic captions' (Live Caption) toggle.">Automatic captions</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_TRANSLATE_INSTANT_LABEL" desc="Label of the 'instant translation' (Live Translate) toggle.">Instant translation</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_TRANSLATE_INSTANT_HINT" desc="Small parenthetical hint under the instant translation toggle.">(sent to Google for speed)</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_SPELLCHECK_TITLE" desc="Heading on the spell check wizard screen.">Turn on spell check?</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_SPELLCHECK_TEXT" desc="Body text on the spell check wizard screen.">Helps with your spelling by underlining grammar and spelling mistakes in text.</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_SPELLCHECK_LABEL" desc="Label of the spell check toggle.">Spell check</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_PRELOAD_TITLE" desc="Heading on the page preloading wizard screen.">Want to turn on page preloading?</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_PRELOAD_TEXT" desc="Body text on the page preloading wizard screen.">This speeds up loading sites by making requests ahead of time and caching the page you'll likely open.</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_PRELOAD_NOTICE" desc="Warning note on the preloading screen about requests happening even with no tabs open.">Important! This makes network requests ahead of time, so even with the browser open and no tabs, a couple of network requests may slip through!</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_PRELOAD_LABEL" desc="Label of the page preloading toggle.">Page preloading</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_ENGINE_TITLE" desc="Heading on the default search engine wizard screen.">Which search engine should we use?</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_ENGINE_TEXT" desc="Body text on the default search engine wizard screen.">By default, search is done through Google, but you can choose another one if you'd like.</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_ENGINE_DEFAULT_BADGE" desc="Badge shown next to whichever search engine option is currently selected/default.">Enabled by default</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_ENGINE_NONE_NAME" desc="Name of the 'no default search engine' option in the search engine list.">None</message>
+      <message name="IDS_NBROWSER_FIRST_RUN_WIZARD_ENGINE_NONE_HINT" desc="Small subtitle under the 'no default search engine' option, mirroring the host subtitle shown under the other engines.">No search engine</message>
     </messages>
   </release>
 </grit>

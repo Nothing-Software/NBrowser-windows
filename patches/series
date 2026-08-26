@@ -26,4 +26,8 @@ nbrowser/windows/windows-nbrowser-increment-icon-version.patch
 nbrowser/windows/windows-nbrowser-external-extensions.patch
 nbrowser/windows/windows-nbrowser-default-flags.patch
 nbrowser/windows/windows-nbrowser-first-run-locale-wiring.patch
+nbrowser/windows/windows-nbrowser-first-run-id-budget.patch
 nbrowser/windows/windows-nbrowser-first-run-url.patch
+nbrowser/windows/windows-nbrowser-restore-google-search.patch
+nbrowser/windows/windows-nbrowser-first-run-prefs-deps.patch
+nbrowser/windows/windows-nbrowser-first-run-language-prefs.patch

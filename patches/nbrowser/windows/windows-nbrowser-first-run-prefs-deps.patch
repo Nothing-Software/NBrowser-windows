@@ -1,0 +1,25 @@
+--- a/chrome/browser/ui/webui/BUILD.gn
++++ b/chrome/browser/ui/webui/BUILD.gn
+@@ -58,6 +58,9 @@
+     "//chrome/browser/glic",
+     "//chrome/browser/glic:impl",
++    "//chrome/browser/lifetime",
+     "//chrome/browser/optimization_guide",
++    "//chrome/browser/preloading:prefs",
++    "//chrome/browser/search_engines",
+     "//chrome/browser/ui",
+     "//chrome/browser/ui/webui/about",
+     "//chrome/browser/ui/webui/accessibility",
+@@ -98,7 +101,12 @@
+     "//chrome/browser/ui/webui/version",
+     "//components/compose:buildflags",
++    "//components/language/core/browser",
+     "//components/lens:buildflags",
++    "//components/live_caption:constants",
++    "//components/search_engines",
+     "//components/security_interstitials/content:security_interstitial_page",
++    "//components/spellcheck/browser",
++    "//components/translate/core/browser",
+     "//components/webui/user_actions",
+     "//content/public/browser",
+     "//extensions/buildflags",
