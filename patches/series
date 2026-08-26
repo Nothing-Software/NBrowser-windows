@@ -31,3 +31,4 @@ nbrowser/windows/windows-nbrowser-first-run-url.patch
 nbrowser/windows/windows-nbrowser-restore-google-search.patch
 nbrowser/windows/windows-nbrowser-first-run-prefs-deps.patch
 nbrowser/windows/windows-nbrowser-first-run-language-prefs.patch
+nbrowser/windows/windows-nbrowser-default-settings.patch

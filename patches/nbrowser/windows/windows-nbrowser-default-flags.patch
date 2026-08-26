@@ -1,16 +1,24 @@
 diff --git a/components/webui/flags/pref_service_flags_storage.cc b/components/webui/flags/pref_service_flags_storage.cc
-index dda7d5c534..50f69d05d3 100644
+index dda7d5c534..f0271f8ce8 100644
 --- a/components/webui/flags/pref_service_flags_storage.cc
 +++ b/components/webui/flags/pref_service_flags_storage.cc
-@@ -87,7 +87,10 @@ void PrefServiceFlagsStorage::CommitPendingWrites() {
- 
+@@ -87,8 +87,17 @@ void PrefServiceFlagsStorage::CommitPendingWrites() {
+
  // static
  void PrefServiceFlagsStorage::RegisterPrefs(PrefRegistrySimple* registry) {
 -  registry->RegisterListPref(prefs::kAboutFlagsEntries);
+-  registry->RegisterDictionaryPref(prefs::kAboutFlagsOriginLists);
 +  base::ListValue default_flags;
 +  default_flags.Append("extension-mime-request-handling@2");
 +  default_flags.Append("enable-parallel-downloading@1");
++  default_flags.Append("smooth-scrolling@1");
++  default_flags.Append("custom-ntp");
 +  registry->RegisterListPref(prefs::kAboutFlagsEntries, std::move(default_flags));
-   registry->RegisterDictionaryPref(prefs::kAboutFlagsOriginLists);
++
++  base::DictValue default_origin_lists;
++  default_origin_lists.Set("custom-ntp", "chrome://new-tab-page");
++  registry->RegisterDictionaryPref(prefs::kAboutFlagsOriginLists,
++                                   std::move(default_origin_lists));
  }
- 
+
+ #if BUILDFLAG(IS_CHROMEOS)

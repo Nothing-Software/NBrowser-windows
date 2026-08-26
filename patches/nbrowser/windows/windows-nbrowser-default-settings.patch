@@ -1,0 +1,116 @@
+--- a/chrome/browser/prefs/session_startup_pref.cc
++++ b/chrome/browser/prefs/session_startup_pref.cc
+@@ -75,7 +75,7 @@ SessionStartupPref::Type SessionStartupPref::GetDefaultStartupType() {
+     return SessionStartupPref::LAST;
+   }
+ #endif
+-  return SessionStartupPref::DEFAULT;
++  return SessionStartupPref::LAST;
+ #endif
+ }
+
+--- a/components/bookmarks/browser/bookmark_utils.cc
++++ b/components/bookmarks/browser/bookmark_utils.cc
+@@ -451,7 +451,7 @@ bool DoesBookmarkContainWords(const std::u16string& title,
+
+ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+   registry->RegisterBooleanPref(
+-      prefs::kShowBookmarkBar, true,
++      prefs::kShowBookmarkBar, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   // `BookmarkBarVisibilityState::kOnlyShowOnNtp` is equivalent to
+   // `kShowBookmarkBar` set to false.
+@@ -464,7 +464,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+       prefs::kShowAppsShortcutInBookmarkBar, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterBooleanPref(
+-      prefs::kShowTabGroupsInBookmarkBar, true,
++      prefs::kShowTabGroupsInBookmarkBar, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterBooleanPref(
+       prefs::kShowManagedBookmarksInBookmarkBar, true,
+--- a/components/saved_tab_groups/public/pref_names.cc
++++ b/components/saved_tab_groups/public/pref_names.cc
+@@ -33,7 +33,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+ #endif  // BUILDFLAG(IS_ANDROID)
+
+   registry->RegisterBooleanPref(
+-      kAutoPinNewTabGroups, true,
++      kAutoPinNewTabGroups, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+
+   registry->RegisterBooleanPref(prefs::kSavedTabGroupSpecificsToDataMigration,
+--- a/components/autofill/core/common/autofill_prefs.cc
++++ b/components/autofill/core/common/autofill_prefs.cc
+@@ -98,7 +98,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+
+   // Non-synced prefs. Used for per-device choices, e.g., signin promo.
+   registry->RegisterDictionaryPref(kAutofillAiOptInStatus);
+-  registry->RegisterBooleanPref(kAutofillEmailVerificationEnabled, true);
++  registry->RegisterBooleanPref(kAutofillEmailVerificationEnabled, false);
+   registry->RegisterDictionaryPref(kAutofillEmailVerificationState);
+   registry->RegisterBooleanPref(kAutofillCreditCardFidoAuthEnabled, false);
+ #if BUILDFLAG(IS_ANDROID)
+--- a/chrome/browser/ui/toolbar/toolbar_pref_names.cc
++++ b/chrome/browser/ui/toolbar/toolbar_pref_names.cc
+@@ -23,6 +23,12 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+     default_pinned_actions.Append(chrome_labs_action.value());
+   }
+
++  const std::optional<std::string>& translate_action =
++      actions::ActionIdMap::ActionIdToString(kActionShowTranslate);
++  if (translate_action.has_value()) {
++    default_pinned_actions.Append(translate_action.value());
++  }
++
+   if (base::FeatureList::IsEnabled(
+           features::kTabsFromOtherDevicesSidePanelPinnedByDefault)) {
+     const std::optional<std::string>& tabs_from_other_devices_action =
+--- a/chrome/browser/ui/browser_ui_prefs.cc
++++ b/chrome/browser/ui/browser_ui_prefs.cc
+@@ -145,7 +145,7 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
+   registry->RegisterDictionaryPref(prefs::kBrowserWindowPlacementPopup);
+   registry->RegisterDictionaryPref(prefs::kAppWindowPlacement);
+   registry->RegisterBooleanPref(
+-      prefs::kEnableDoNotTrack, false,
++      prefs::kEnableDoNotTrack, true,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+ #if !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_ANDROID)
+   registry->RegisterBooleanPref(prefs::kPrintPreviewUseSystemDefaultPrinter,
+@@ -218,7 +218,7 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
+ #endif
+
+   registry->RegisterBooleanPref(
+-      prefs::kHttpsOnlyModeEnabled, false,
++      prefs::kHttpsOnlyModeEnabled, true,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterBooleanPref(
+       prefs::kHttpsFirstBalancedMode, false,
+--- a/chrome/browser/profiles/profile_impl.cc
++++ b/chrome/browser/profiles/profile_impl.cc
+@@ -420,7 +420,7 @@ void ProfileImpl::RegisterProfilePrefs(
+   registry->RegisterStringPref(prefs::kHomePage, std::string(),
+                                home_page_flags);
+   registry->RegisterStringPref(prefs::kNewTabPageLocationOverride,
+-                               std::string());
++                               "chrome://new-tab-page");
+
+ #if BUILDFLAG(ENABLE_PRINTING)
+   registry->RegisterBooleanPref(prefs::kPrintingEnabled, true);
+--- a/chrome/app/chrome_main_delegate.cc
++++ b/chrome/app/chrome_main_delegate.cc
+@@ -1088,6 +1088,14 @@ std::optional<int> ChromeMainDelegate::BasicStartupComplete() {
+   // The DevTools remote debugging pipe file descriptors need to be checked
+   // before any other files are opened, see https://crbug.com/40259890.
+   const bool is_browser = !command_line.HasSwitch(switches::kProcessType);
++
++  // NBrowser: force smooth scrolling on regardless of the OS-level animation
++  // setting and independent of chrome://flags (Reset All only clears the
++  // flags storage, not this switch).
++  if (is_browser) {
++    base::CommandLine::ForCurrentProcess()->AppendSwitch(
++        switches::kEnableSmoothScrolling);
++  }
+ #if BUILDFLAG(IS_WIN)
+   const bool pipes_are_specified_explicitly =
+       command_line.HasSwitch(::switches::kRemoteDebuggingIoPipes);
