@@ -85,22 +85,57 @@ constexpr char kNbrowserFirstRunCss[] = R"(
  body.js-reveal .hero-logo.is-visible{opacity:1;transform:scale(1)}
 )";
 
+// Scroll-reveal script, served as a real sub-resource (script.js) rather
+// than inlined - lets the page CSP stay at script-src 'self' instead of
+// 'unsafe-inline', matching the pattern used elsewhere in chrome/browser/ui/webui
+// (e.g. arc_power_control_ui.cc, bluetooth_internals_ui.cc).
+constexpr char kNbrowserFirstRunScript[] = R"(
+(function(){
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.body.classList.add('js-reveal');
+  var targets = document.querySelectorAll('.reveal, .hero-logo');
+  if (!('IntersectionObserver' in window)) {
+    targets.forEach(function(t){ t.classList.add('is-visible'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-visible');
+        io.unobserve(entry.target);
+      }
+    });
+  }, {threshold: 0.15, rootMargin: '0px 0px -8% 0px'});
+  targets.forEach(function(t){ io.observe(t); });
+})();
+)";
+
 class UFRDataSource : public content::URLDataSource {
  public:
   UFRDataSource() {}
   UFRDataSource(const UFRDataSource&) = delete;
   UFRDataSource& operator=(const UFRDataSource&) = delete;
-  std::string GetSource() { return "nbrowser-first-run"; }
-  std::string GetMimeType(const GURL& url) { return "text/html"; }
-  std::string GetContentSecurityPolicy(network::mojom::CSPDirectiveName directive) {
-    // ScriptSrc: needed for the small inline scroll-reveal script below.
+  std::string GetSource() override { return "nbrowser-first-run"; }
+  std::string GetMimeType(const GURL& url) override {
+    std::string path = content::URLDataSource::URLToRequestPath(url);
+    return path == "script.js" ? "text/javascript" : "text/html";
+  }
+  std::string GetContentSecurityPolicy(
+      network::mojom::CSPDirectiveName directive) override {
+    // ScriptSrc: needed to load the scroll-reveal script.js sub-resource.
     if (directive == network::mojom::CSPDirectiveName::ScriptSrc)
-      return "script-src 'unsafe-inline'";
+      return "script-src 'self'";
     return std::string();
   }
   void StartDataRequest(const GURL& url,
                         const content::WebContents::Getter& wc_getter,
-                        GotDataCallback callback) {
+                        GotDataCallback callback) override {
+    std::string path = content::URLDataSource::URLToRequestPath(url);
+    if (path == "script.js") {
+      std::move(callback).Run(base::MakeRefCounted<base::RefCountedString>(
+          std::string(kNbrowserFirstRunScript)));
+      return;
+    }
     auto S = [](int id) { return l10n_util::GetStringUTF8(id); };
     std::string source = base::StrCat({
 R"(<!doctype html>
@@ -196,26 +231,7 @@ R"(<!doctype html>
  <p>)", S(IDS_NBROWSER_FIRST_RUN_FOOTER_REVISIT), R"(</p>
  <p><a class="quiet-link" href="https://web.tribute.tg/d/FIQ">)", S(IDS_NBROWSER_FIRST_RUN_FOOTER_DONATE), R"(</a></p>
 </footer>
-<script>
-(function(){
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  document.body.classList.add('js-reveal');
-  var targets = document.querySelectorAll('.reveal, .hero-logo');
-  if (!('IntersectionObserver' in window)) {
-    targets.forEach(function(t){ t.classList.add('is-visible'); });
-    return;
-  }
-  var io = new IntersectionObserver(function(entries){
-    entries.forEach(function(entry){
-      if (entry.isIntersecting) {
-        entry.target.classList.add('is-visible');
-        io.unobserve(entry.target);
-      }
-    });
-  }, {threshold: 0.15, rootMargin: '0px 0px -8% 0px'});
-  targets.forEach(function(t){ io.observe(t); });
-})();
-</script>
+<script src="script.js"></script>
 )"});
     std::move(callback).Run(base::MakeRefCounted<base::RefCountedString>(std::move(source)));
   }
