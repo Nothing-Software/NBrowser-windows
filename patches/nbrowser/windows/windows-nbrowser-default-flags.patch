@@ -1,8 +1,8 @@
 diff --git a/components/webui/flags/pref_service_flags_storage.cc b/components/webui/flags/pref_service_flags_storage.cc
-index dda7d5c534..f0271f8ce8 100644
+index dda7d5c534..422cf0c0a6 100644
 --- a/components/webui/flags/pref_service_flags_storage.cc
 +++ b/components/webui/flags/pref_service_flags_storage.cc
-@@ -87,8 +87,17 @@ void PrefServiceFlagsStorage::CommitPendingWrites() {
+@@ -87,8 +87,18 @@ void PrefServiceFlagsStorage::CommitPendingWrites() {
 
  // static
  void PrefServiceFlagsStorage::RegisterPrefs(PrefRegistrySimple* registry) {
@@ -13,6 +13,7 @@ index dda7d5c534..f0271f8ce8 100644
 +  default_flags.Append("enable-parallel-downloading@1");
 +  default_flags.Append("smooth-scrolling@1");
 +  default_flags.Append("custom-ntp");
++  default_flags.Append("close-window-with-last-tab@1");
 +  registry->RegisterListPref(prefs::kAboutFlagsEntries, std::move(default_flags));
 +
 +  base::DictValue default_origin_lists;
