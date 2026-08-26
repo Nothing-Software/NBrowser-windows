@@ -1,6 +1,9 @@
 #ifndef CHROME_BROWSER_UI_WEBUI_UNGOOGLED_FIRST_RUN_H_
 #define CHROME_BROWSER_UI_WEBUI_UNGOOGLED_FIRST_RUN_H_
 
+#include <string>
+#include <vector>
+
 #include "base/functional/bind.h"
 #include "base/memory/ref_counted_memory.h"
 #include "base/strings/strcat.h"
@@ -11,7 +14,9 @@
 #include "chrome/browser/preloading/preloading_prefs.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
+#include "chrome/browser/spellchecker/spellcheck_service.h"
 #include "chrome/browser/ui/webui/nbrowser_first_run/grit/nbrowser_first_run_strings.h"
+#include "components/language/core/browser/language_prefs.h"
 #include "components/language/core/browser/pref_names.h"
 #include "components/live_caption/pref_names.h"
 #include "components/prefs/pref_service.h"
@@ -587,14 +592,32 @@ constexpr char kNbrowserFirstRunScript[] = R"(
     }, 1800);
   }
 
-  /* Screen 0: picking a language writes it and restarts the browser to
-     apply it - the wizard reopens automatically in the new language
-     (see the "pending relaunch" local_state flag in chrome_browser_main.cc). */
+  /* Screen 0: picking a language different from the one the browser already
+     runs in writes it and restarts to apply it - the wizard reopens
+     automatically in the new language (see the "pending relaunch" local_state
+     flag in chrome_browser_main.cc). Re-picking the language the browser is
+     already in (e.g. the OS's language, which the browser already launched
+     with) just advances to the next screen - there is nothing to apply, so
+     the button reads "Continue" instead of "Restart". */
   function initLangScreen() {
     var btn = document.getElementById('lang-restart-btn');
     var select = document.getElementById('lang-select');
     if (!btn || !select) return;
+    var currentLocale = btn.getAttribute('data-current-locale');
+    var labelContinue = btn.getAttribute('data-label-continue');
+    var labelRestart = btn.getAttribute('data-label-restart');
+
+    function syncLabel() {
+      btn.textContent = select.value === currentLocale ? labelContinue : labelRestart;
+    }
+    syncLabel();
+    select.addEventListener('change', syncLabel);
+
     btn.addEventListener('click', function () {
+      if (select.value === currentLocale) {
+        go(1);
+        return;
+      }
       chrome.send('nbrowserFirstRunSetLanguageAndRestart', [select.value]);
     });
   }
@@ -743,6 +766,33 @@ class NbrowserFirstRunHandler : public content::WebUIMessageHandler {
     local_state->SetString(language::prefs::kApplicationLocale, locale);
     local_state->SetBoolean(kLanguageChosenPref, true);
     local_state->SetBoolean(kPendingRelaunchPref, true);
+
+    // Also move the chosen language to the top of Settings -> Languages ->
+    // "Sites in your languages" (the accept-languages list), the same way a
+    // user who reordered it there by hand would end up. Without this, sites
+    // keep being requested in English after switching the whole browser UI
+    // to another language, because changing the UI locale alone never
+    // touches the separate accept-languages pref. English is already first
+    // there by default, so choosing it back is a no-op.
+    if (locale != "en-US" && locale != "en") {
+      PrefService* profile_prefs = Profile::FromWebUI(web_ui())->GetPrefs();
+      language::LanguagePrefs language_prefs(profile_prefs);
+      std::vector<std::string> languages;
+      language_prefs.GetUserSelectedLanguagesList(&languages);
+      std::erase(languages, locale);
+      languages.insert(languages.begin(), locale);
+      language_prefs.SetUserSelectedLanguagesList(languages);
+
+      // Normally only done once, for the first accept-language a profile is
+      // ever created with (see profile_impl.cc) - re-run it now that the
+      // accept-languages list has actually changed, so the new language also
+      // lands in Settings -> Languages -> spell check, checked, regardless of
+      // whether the "spellcheck" toggle on the previous screen ends up on or
+      // off (that toggle only controls spellchecking overall, not which
+      // dictionaries are considered enabled).
+      SpellcheckService::EnableFirstUserLanguageForSpellcheck(profile_prefs);
+    }
+
     chrome::AttemptRestart();
   }
 };
@@ -858,7 +908,10 @@ R"(<!doctype html>
      </select>
     </div>
     <div class="actions actions--hero" data-reveal>
-     <button class="btn btn--invert" type="button" id="lang-restart-btn">)", S(IDS_NBROWSER_FIRST_RUN_WIZARD_LANG_RESTART), R"(</button>
+     <button class="btn btn--invert" type="button" id="lang-restart-btn"
+         data-current-locale=")", current_locale, R"("
+         data-label-continue=")", S(IDS_NBROWSER_FIRST_RUN_WIZARD_CONTINUE), R"("
+         data-label-restart=")", S(IDS_NBROWSER_FIRST_RUN_WIZARD_LANG_RESTART), R"(">)", S(IDS_NBROWSER_FIRST_RUN_WIZARD_LANG_RESTART), R"(</button>
     </div>
    </div>
   </section>
