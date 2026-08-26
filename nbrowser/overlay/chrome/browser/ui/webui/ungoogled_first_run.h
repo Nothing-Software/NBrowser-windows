@@ -142,6 +142,26 @@ TemplateURL* ResolveSearchEngine(TemplateURLService* service,
   return service->Add(std::make_unique<TemplateURL>(data));
 }
 
+// Fixes the prepopulated "google.com" entry's search_url/suggest_url in
+// place if they still use {google:baseURL}-style macros, which resolve
+// through google_util::kGoogleHomepageURL - a compiled-in constant that
+// ungoogled-chromium's domain substitution build step rewrites to a
+// non-resolving *.qjz9zk host. Chromium hardcodes Google as the universal
+// prepopulated fallback default search engine (independent of locale), so a
+// fresh profile already has this broken entry as its default *before* the
+// user ever touches the wizard - a plain click handler that only fires on
+// an explicit radio change would miss that case. Idempotent (no-ops once
+// already fixed), so safe to call unconditionally on every page render.
+void EnsureGoogleSearchUrlIsUsable(TemplateURLService* service) {
+  TemplateURL* google = service->GetTemplateURLForKeyword(u"google.com");
+  if (!google || google->url().find("{google:baseURL}") == std::string::npos)
+    return;
+  service->ResetTemplateURL(
+      google, u"Google", u"google.com",
+      "https://www.google.com/search?q={searchTerms}&ie={inputEncoding}",
+      "https://www.google.com/complete/search?client=chrome&q={searchTerms}");
+}
+
 // CSS for the whole page. Uses the standard chrome://resources text styling
 // baseline, then the page's own rules; no brand accent color is used (the
 // NBrowser identity is strictly monochrome), so light/dark theming, the
@@ -704,6 +724,7 @@ class NbrowserFirstRunHandler : public content::WebUIMessageHandler {
       return;
     }
     if (key == "google") {
+      EnsureGoogleSearchUrlIsUsable(service);
       if (TemplateURL* google = service->GetTemplateURLForKeyword(u"google.com"))
         service->SetUserSelectedDefaultSearchProvider(google);
       return;
@@ -774,6 +795,11 @@ class UFRDataSource : public content::URLDataSource {
     std::string current_engine_key = "none";
     if (TemplateURLService* service =
             TemplateURLServiceFactory::GetForProfile(profile_)) {
+      // Chromium hardcodes Google as the prepopulated fallback default, so a
+      // fresh profile already has the broken macro'd entry active before the
+      // user ever interacts with this page - fix it here unconditionally,
+      // not just in response to an explicit radio click.
+      EnsureGoogleSearchUrlIsUsable(service);
       if (const TemplateURL* current = service->GetDefaultSearchProvider()) {
         std::string key = EngineKeyForPrepopulateId(current->prepopulate_id());
         if (!key.empty())
