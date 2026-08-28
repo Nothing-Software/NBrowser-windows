@@ -1,0 +1,1354 @@
+diff --git a/chrome/browser/resources/side_panel/customize_chrome/appearance.css b/chrome/browser/resources/side_panel/customize_chrome/appearance.css
+index 96b207bd47..f4151d2f0d 100644
+--- a/chrome/browser/resources/side_panel/customize_chrome/appearance.css
++++ b/chrome/browser/resources/side_panel/customize_chrome/appearance.css
+@@ -99,15 +99,6 @@ cr-theme-color-picker {
+   --cr-icon-image: url('chrome://resources/images/open_in_new.svg');
+ }
+ 
+-#followThemeToggle {
+-  display: flex;
+-  justify-content: space-between;
+-  align-items: center;
+-  margin: 8px 0;
+-  padding: 10px var(--sp-card-inline-padding);
+-}
+-
+-#followThemeToggleTitle {
+-  font-size: inherit;
+-  line-height: inherit;
++#savePresetButton {
++  margin: 8px var(--sp-card-inline-padding) 8px;
+ }
+diff --git a/chrome/browser/resources/side_panel/customize_chrome/appearance.html.ts b/chrome/browser/resources/side_panel/customize_chrome/appearance.html.ts
+index 7c05052814..8a8aa1a7db 100644
+--- a/chrome/browser/resources/side_panel/customize_chrome/appearance.html.ts
++++ b/chrome/browser/resources/side_panel/customize_chrome/appearance.html.ts
+@@ -59,18 +59,14 @@ ${this.showManagedButton_ ? html`
+   ` : ''}
+ </div>
+ <hr class="sp-hr" ?hidden="${!this.showEditTheme_}">
+-<customize-color-scheme-mode></customize-color-scheme-mode>
+ <cr-theme-color-picker id="chromeColors" ?hidden="${!this.showColorPicker_}">
+ </cr-theme-color-picker>
+ <hr class="sp-hr" ?hidden="${!this.showBottomDivider_}">
+-<div id="followThemeToggle" class="sp-card-content"
+-    ?hidden="${!this.showDeviceThemeToggle_}">
+-  <div id="followThemeToggleTitle">$i18n{followThemeToggle}</div>
+-  <cr-toggle id="followThemeToggleControl" title="$i18n{followThemeToggle}"
+-      ?checked="${!!this.theme_ && this.theme_.followDeviceTheme}"
+-      @change="${this.onFollowThemeToggleChange_}">
+-  </cr-toggle>
+-</div>
++<cr-button id="savePresetButton"
++    ?hidden="${!this.showColorPicker_}"
++    @click="${this.onSavePresetClick_}">
++  $i18n{savePresetButton}
++</cr-button>
+ <customize-chrome-hover-button id="setClassicChromeButton"
+     ?hidden="${!this.showClassicChromeButton_}"
+     label="$i18n{resetToClassicChrome}"
+diff --git a/chrome/browser/resources/side_panel/customize_chrome/appearance.ts b/chrome/browser/resources/side_panel/customize_chrome/appearance.ts
+index bfca83dede..d7eabe20de 100644
+--- a/chrome/browser/resources/side_panel/customize_chrome/appearance.ts
++++ b/chrome/browser/resources/side_panel/customize_chrome/appearance.ts
+@@ -5,14 +5,11 @@
+ import './theme_snapshot.js';
+ import './hover_button.js';
+ import '/strings.m.js'; // Required by <managed-dialog>.
+-import 'chrome://resources/cr_components/customize_color_scheme_mode/customize_color_scheme_mode.js';
+ import 'chrome://resources/cr_components/theme_color_picker/theme_color_picker.js';
+ import 'chrome://resources/cr_components/managed_dialog/managed_dialog.js';
+ import 'chrome://resources/cr_elements/cr_button/cr_button.js';
+-import 'chrome://resources/cr_elements/cr_toggle/cr_toggle.js';
+ 
+ import {getInstance as getAnnouncerInstance} from 'chrome://resources/cr_elements/cr_a11y_announcer/cr_a11y_announcer.js';
+-import type {CrToggleElement} from 'chrome://resources/cr_elements/cr_toggle/cr_toggle.js';
+ import {I18nMixinLit} from 'chrome://resources/cr_elements/i18n_mixin_lit.js';
+ import {assert} from 'chrome://resources/js/assert.js';
+ import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
+@@ -25,16 +22,16 @@ import {CustomizeChromeAction, recordCustomizeChromeAction} from './common.js';
+ import {NewTabPageType} from './customize_chrome.mojom-webui.js';
+ import type {Theme} from './customize_chrome.mojom-webui.js';
+ import {CustomizeChromeApiProxy} from './customize_chrome_api_proxy.js';
++import {browserProxyFactory as themeColorPickerBrowserProxyFactory} from 'chrome://resources/cr_components/theme_color_picker/theme_color_picker.mojom-webui.js';
++import type {ThemeColorPickerElement} from 'chrome://resources/cr_components/theme_color_picker/theme_color_picker.js';
+ 
+ export interface AppearanceElement {
+   $: {
+-    chromeColors: HTMLElement,
++    chromeColors: ThemeColorPickerElement,
+     editThemeButton: HTMLButtonElement,
+     themeSnapshot: HTMLElement,
+     setClassicChromeButton: HTMLButtonElement,
+     thirdPartyThemeLinkButton: HTMLButtonElement,
+-    followThemeToggle: HTMLElement,
+-    followThemeToggleControl: CrToggleElement,
+     uploadedImageButton: HTMLButtonElement,
+     searchedImageButton: HTMLButtonElement,
+   };
+@@ -73,7 +70,6 @@ export class AppearanceElement extends AppearanceElementBase {
+       showBottomDivider_: {type: Boolean},
+       showClassicChromeButton_: {type: Boolean},
+       showColorPicker_: {type: Boolean},
+-      showDeviceThemeToggle_: {type: Boolean},
+       showThemeSnapshot_: {type: Boolean},
+       showUploadedImageButton_: {type: Boolean},
+       showSearchedImageButton_: {type: Boolean},
+@@ -101,7 +97,6 @@ export class AppearanceElement extends AppearanceElementBase {
+   protected accessor showBottomDivider_: boolean = false;
+   protected accessor showClassicChromeButton_: boolean = false;
+   protected accessor showColorPicker_: boolean = false;
+-  protected accessor showDeviceThemeToggle_: boolean = false;
+   protected accessor showThemeSnapshot_: boolean = false;
+   protected accessor showUploadedImageButton_: boolean = false;
+   protected accessor showSearchedImageButton_: boolean = false;
+@@ -172,7 +167,6 @@ export class AppearanceElement extends AppearanceElementBase {
+       this.thirdPartyThemeName_ = this.computeThirdPartyThemeName_();
+       this.showClassicChromeButton_ = this.computeShowClassicChromeButton_();
+       this.showColorPicker_ = this.computeShowColorPicker_();
+-      this.showDeviceThemeToggle_ = this.computeShowDeviceThemeToggle_();
+       this.showThemeSnapshot_ = this.computeShowThemeSnapshot_();
+       this.showUploadedImageButton_ = this.computeShowUploadedImageButton_();
+       this.showSearchedImageButton_ = this.computeShowSearchedImageButton_();
+@@ -230,7 +224,7 @@ export class AppearanceElement extends AppearanceElementBase {
+   }
+ 
+   private computeShowBottomDivider_(): boolean {
+-    return this.showClassicChromeButton_ || this.showDeviceThemeToggle_;
++    return this.showClassicChromeButton_ || this.showColorPicker_;
+   }
+ 
+   private computeShowClassicChromeButton_(): boolean {
+@@ -249,11 +243,6 @@ export class AppearanceElement extends AppearanceElementBase {
+     return !!this.theme_ && !this.theme_.thirdPartyThemeInfo;
+   }
+ 
+-  private computeShowDeviceThemeToggle_(): boolean {
+-    return loadTimeData.getBoolean('showDeviceThemeToggle') &&
+-        !(!!this.theme_ && !!this.theme_.thirdPartyThemeInfo);
+-  }
+-
+   private computeShowThemeSnapshot_(): boolean {
+     return !!this.theme_ && !this.theme_.thirdPartyThemeInfo &&
+         (!(this.theme_.backgroundImage &&
+@@ -326,8 +315,10 @@ export class AppearanceElement extends AppearanceElementBase {
+         CustomizeChromeAction.SET_CLASSIC_CHROME_THEME_CLICKED);
+   }
+ 
+-  protected onFollowThemeToggleChange_(e: CustomEvent<boolean>) {
+-    this.apiProxy_.handler.setFollowDeviceTheme(e.detail);
++  protected async onSavePresetClick_() {
++    await themeColorPickerBrowserProxyFactory.getInstance()
++        .handler.saveCurrentColorPreset();
++    await this.$.chromeColors.refreshSavedPresets();
+   }
+ 
+   protected onManagedDialogClose_() {
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/BUILD.gn b/ui/webui/resources/cr_components/theme_color_picker/BUILD.gn
+index 5a154d864c..3d4dedbc98 100644
+--- a/ui/webui/resources/cr_components/theme_color_picker/BUILD.gn
++++ b/ui/webui/resources/cr_components/theme_color_picker/BUILD.gn
+@@ -27,6 +27,8 @@ build_webui("build") {
+     "check_mark_wrapper.css",
+     "theme_color.css",
+     "theme_color_picker.css",
++    "theme_color_swatch_field.css",
++    "theme_exact_hex_dialog.css",
+     "theme_hue_slider_dialog.css",
+   ]
+ 
+@@ -38,6 +40,10 @@ build_webui("build") {
+     "theme_color.ts",
+     "theme_color_picker.html.ts",
+     "theme_color_picker.ts",
++    "theme_color_swatch_field.html.ts",
++    "theme_color_swatch_field.ts",
++    "theme_exact_hex_dialog.html.ts",
++    "theme_exact_hex_dialog.ts",
+     "theme_hue_slider_dialog.html.ts",
+     "theme_hue_slider_dialog.ts",
+   ]
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/check_mark_wrapper.css b/ui/webui/resources/cr_components/theme_color_picker/check_mark_wrapper.css
+index 743bb0f702..0ee89738b4 100644
+--- a/ui/webui/resources/cr_components/theme_color_picker/check_mark_wrapper.css
++++ b/ui/webui/resources/cr_components/theme_color_picker/check_mark_wrapper.css
+@@ -22,7 +22,7 @@
+ }
+ 
+ svg {
+-  display: block;
++  display: none;
+   height: var(--cr-theme-color-check-mark-wrapper-size);
+   left: initial;
+   position: absolute;
+@@ -32,8 +32,13 @@ svg {
+   z-index: 1;
+ }
+ 
+-:host(:not([checked])) svg {
+-  display: none;
++:host([checked]) svg {
++  display: block;
++}
++
++:host([deletable]:hover) svg {
++  cursor: pointer;
++  display: block;
+ }
+ 
+ :host-context([dir=rtl]) svg {
+@@ -48,3 +53,19 @@ svg {
+ #checkMark {
+   fill: var(--cr-theme-color-check-mark-wrapper-color);
+ }
++
++#deleteMark {
++  display: none;
++  fill: none;
++  stroke: var(--cr-theme-color-check-mark-wrapper-color);
++  stroke-linecap: round;
++  stroke-width: 4;
++}
++
++:host([deletable]:hover) #checkMark {
++  display: none;
++}
++
++:host([deletable]:hover) #deleteMark {
++  display: block;
++}
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/check_mark_wrapper.html.ts b/ui/webui/resources/cr_components/theme_color_picker/check_mark_wrapper.html.ts
+index eed7ee041a..2d100198de 100644
+--- a/ui/webui/resources/cr_components/theme_color_picker/check_mark_wrapper.html.ts
++++ b/ui/webui/resources/cr_components/theme_color_picker/check_mark_wrapper.html.ts
+@@ -8,10 +8,12 @@ import type {CheckMarkWrapperElement} from './check_mark_wrapper.js';
+ 
+ export function getHtml(this: CheckMarkWrapperElement) {
+   return html`
+-<svg id="svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
++<svg id="svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"
++    @click="${this.onDeleteClick_}">
+   <circle id="background" cx="24" cy="24" r="24"></circle>
+   <path id="checkMark" d="M20 34 10 24l2.83-2.83L20 28.34l15.17-15.17L38 16Z">
+   </path>
++  <path id="deleteMark" d="M16 16 32 32M32 16 16 32"></path>
+ </svg>
+ <slot></slot>`;
+ }
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/check_mark_wrapper.ts b/ui/webui/resources/cr_components/theme_color_picker/check_mark_wrapper.ts
+index c066367952..28418d6413 100644
+--- a/ui/webui/resources/cr_components/theme_color_picker/check_mark_wrapper.ts
++++ b/ui/webui/resources/cr_components/theme_color_picker/check_mark_wrapper.ts
+@@ -32,10 +32,27 @@ export class CheckMarkWrapperElement extends CrLitElement {
+         type: Boolean,
+         reflect: true,
+       },
++
++      // When true, the badge also shows (on hover) as a clickable "delete"
++      // (X) affordance instead of the checkmark, regardless of `checked`.
++      deletable: {
++        type: Boolean,
++        reflect: true,
++      },
+     };
+   }
+ 
+   accessor checked: boolean = false;
++  accessor deletable: boolean = false;
++
++  protected onDeleteClick_(e: Event) {
++    if (!this.deletable) {
++      return;
++    }
++    e.stopPropagation();
++    e.preventDefault();
++    this.fire('delete-click');
++  }
+ }
+ 
+ declare global {
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/color_utils.ts b/ui/webui/resources/cr_components/theme_color_picker/color_utils.ts
+index 6c77613866..6f413c1acf 100644
+--- a/ui/webui/resources/cr_components/theme_color_picker/color_utils.ts
++++ b/ui/webui/resources/cr_components/theme_color_picker/color_utils.ts
+@@ -59,10 +59,12 @@ export enum ColorType {
+   CHROME,
+   CUSTOM,
+   GREY,
++  PRESET,
+ }
+ 
+ export interface SelectedColor {
+   type: ColorType;
+   chromeColor?: SkColor;
+   variant?: BrowserColorVariant;
++  presetIndex?: number;
+ }
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/theme_color.html.ts b/ui/webui/resources/cr_components/theme_color_picker/theme_color.html.ts
+index d6b641523c..78430deb1f 100644
+--- a/ui/webui/resources/cr_components/theme_color_picker/theme_color.html.ts
++++ b/ui/webui/resources/cr_components/theme_color_picker/theme_color.html.ts
+@@ -8,7 +8,8 @@ import type {ThemeColorElement} from './theme_color.js';
+ 
+ export function getHtml(this: ThemeColorElement) {
+   return html`
+-<cr-theme-color-check-mark-wrapper .checked="${this.checked}">
++<cr-theme-color-check-mark-wrapper .checked="${this.checked}"
++    .deletable="${this.deletable}">
+   <svg viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg"
+       xmlns:xlink="http://www.w3.org/1999/xlink">
+     <rect id="foreground" x="0" y="0" width="50" height="50">
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/theme_color.ts b/ui/webui/resources/cr_components/theme_color_picker/theme_color.ts
+index 986b8bd363..e70efb4fc7 100644
+--- a/ui/webui/resources/cr_components/theme_color_picker/theme_color.ts
++++ b/ui/webui/resources/cr_components/theme_color_picker/theme_color.ts
+@@ -44,6 +44,11 @@ export class ThemeColorElement extends CrLitElement {
+         reflect: true,
+       },
+ 
++      deletable: {
++        type: Boolean,
++        reflect: true,
++      },
++
+       backgroundColorHidden: {
+         type: Boolean,
+         reflect: true,
+@@ -55,6 +60,7 @@ export class ThemeColorElement extends CrLitElement {
+   accessor foregroundColor: SkColor = {value: 0};
+   accessor baseColor: SkColor = {value: 0};
+   accessor checked: boolean = false;
++  accessor deletable: boolean = false;
+   accessor backgroundColorHidden: boolean = false;
+ 
+   override connectedCallback() {
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.html.ts b/ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.html.ts
+index 9d209e9536..45f83a42d1 100644
+--- a/ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.html.ts
++++ b/ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.html.ts
+@@ -52,9 +52,29 @@ export function getHtml(this: ThemeColorPickerElement) {
+             "${this.isChromeColorSelected_(item.seed, item.variant)}"
+         tabindex="${this.chromeColorTabIndex_(item.seed, item.variant)}"
+         data-index="${index}"
+-        @click="${this.onChromeColorClick_}">
++        deletable
++        @click="${this.onChromeColorClick_}"
++        @delete-click="${this.onChromeColorDeleteClick_}">
+     </cr-theme-color>
+   `)}
++    ${this.savedPresets_.map((preset, index) => html`
++      <cr-theme-color
++          class="chrome-color"
++          .backgroundColor="${preset.primary}"
++          .baseColor="${preset.secondary}"
++          .foregroundColor="${preset.accent}"
++          title="${this.i18n('savedPresetName')}"
++          aria-label="${this.i18n('savedPresetName')}"
++          role="radio"
++          ?checked="${this.isSavedPresetSelected_(index)}"
++          aria-checked="${this.isSavedPresetSelected_(index)}"
++          tabindex="${this.tabIndex_(this.isSavedPresetSelected_(index))}"
++          data-index="${index}"
++          deletable
++          @click="${this.onSavedPresetClick_}"
++          @delete-click="${this.onSavedPresetDeleteClick_}">
++      </cr-theme-color>
++    `)}
+     <cr-theme-color
+         id="customColor"
+         .backgroundColor="${this.customColor_.background}"
+@@ -71,9 +91,9 @@ export function getHtml(this: ThemeColorPickerElement) {
+     </cr-theme-color>
+ </cr-grid>
+ 
+-<cr-theme-hue-slider-dialog id="hueSlider"
+-    @selected-hue-changed="${this.onSelectedHueChanged_}">
+-</cr-theme-hue-slider-dialog>
++<cr-theme-exact-hex-dialog id="exactHexDialog"
++    @exact-hex-colors-changed="${this.onExactHexColorsChanged_}">
++</cr-theme-exact-hex-dialog>
+ 
+ ${this.showManagedDialog_ ? html`
+   <managed-dialog @close="${this.onManagedDialogClose_}"
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.ts b/ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.ts
+index 6dd30d8a18..5ffbd747ef 100644
+--- a/ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.ts
++++ b/ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.ts
+@@ -2,7 +2,7 @@
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
+-import './theme_hue_slider_dialog.js';
++import './theme_exact_hex_dialog.js';
+ import './theme_color.js';
+ import '//resources/cr_elements/cr_grid/cr_grid.js';
+ import '//resources/cr_components/managed_dialog/managed_dialog.js';
+@@ -22,8 +22,8 @@ import type {ThemeColorElement} from './theme_color.js';
+ import {getCss} from './theme_color_picker.css.js';
+ import {getHtml} from './theme_color_picker.html.js';
+ import {browserProxyFactory} from './theme_color_picker.mojom-webui.js';
+-import type {ChromeColor, Theme, ThemeColorPickerHandlerInterface} from './theme_color_picker.mojom-webui.js';
+-import type {ThemeHueSliderDialogElement} from './theme_hue_slider_dialog.js';
++import type {ChromeColor, ColorPreset, Theme, ThemeColorPickerHandlerInterface} from './theme_color_picker.mojom-webui.js';
++import type {ThemeExactHexDialogElement} from './theme_exact_hex_dialog.js';
+ 
+ const ThemeColorPickerElementBase = I18nMixinLit(CrLitElement);
+ 
+@@ -31,7 +31,7 @@ export interface ThemeColorPickerElement {
+   $: {
+     customColor: ThemeColorElement,
+     colorPickerIcon: HTMLElement,
+-    hueSlider: ThemeHueSliderDialogElement,
++    exactHexDialog: ThemeExactHexDialogElement,
+   };
+ }
+ 
+@@ -53,6 +53,7 @@ export class ThemeColorPickerElement extends ThemeColorPickerElementBase {
+       defaultColor_: {type: Object, state: true},
+       greyDefaultColor_: {type: Object, state: true},
+       colors_: {type: Array, state: true},
++      savedPresets_: {type: Array, state: true},
+       theme_: {type: Object, state: true},
+       selectedColor_: {type: Object, state: true},
+       isDefaultColorSelected_: {type: Boolean, state: true},
+@@ -67,6 +68,7 @@ export class ThemeColorPickerElement extends ThemeColorPickerElementBase {
+   protected accessor defaultColor_: Color = EMPTY_COLOR;
+   protected accessor greyDefaultColor_: Color = EMPTY_COLOR;
+   protected accessor colors_: ChromeColor[] = [];
++  protected accessor savedPresets_: ColorPreset[] = [];
+   private accessor theme_: Theme|undefined;
+   protected accessor selectedColor_: SelectedColor = {type: ColorType.NONE};
+   protected accessor isDefaultColorSelected_: boolean = false;
+@@ -89,6 +91,7 @@ export class ThemeColorPickerElement extends ThemeColorPickerElementBase {
+               this.theme_ = theme;
+             });
+     this.handler_.updateTheme();
++    this.refreshSavedPresets();
+   }
+ 
+   override disconnectedCallback() {
+@@ -109,7 +112,8 @@ export class ThemeColorPickerElement extends ThemeColorPickerElementBase {
+     }
+ 
+     if (changedPrivateProperties.has('theme_') ||
+-        changedPrivateProperties.has('colors_')) {
++        changedPrivateProperties.has('colors_') ||
++        changedPrivateProperties.has('savedPresets_')) {
+       this.selectedColor_ = this.computeSelectedColor_();
+     }
+ 
+@@ -129,7 +133,7 @@ export class ThemeColorPickerElement extends ThemeColorPickerElementBase {
+ 
+     if (changedPrivateProperties.has('colors_') ||
+         changedPrivateProperties.has('theme_') ||
+-        changedPrivateProperties.has('isCustomColorSelected_')) {
++        changedPrivateProperties.has('selectedColor_')) {
+       this.updateCustomColor_();
+     }
+   }
+@@ -150,9 +154,9 @@ export class ThemeColorPickerElement extends ThemeColorPickerElementBase {
+     if (!this.colors_ || !this.theme_) {
+       return {type: ColorType.NONE};
+     }
+-    if (this.theme_.followDeviceTheme) {
+-      return {type: ColorType.CUSTOM};
+-    }
++    // NBrowser: "Follow device colors" no longer exists as a UI concept -
++    // ThemeService::UsingDeviceTheme() is hardcoded false, so
++    // theme_.followDeviceTheme is always false too. Don't branch on it.
+     if (this.theme_.isGreyBaseline) {
+       return {type: ColorType.GREY};
+     }
+@@ -174,6 +178,15 @@ export class ThemeColorPickerElement extends ThemeColorPickerElementBase {
+         variant: this.theme_.browserColorVariant,
+       };
+     }
++    if (this.theme_.secondaryColor && this.theme_.accentColor) {
++      const presetIndex = this.savedPresets_.findIndex(
++          preset => preset.primary.value === this.theme_!.seedColor.value &&
++              preset.secondary.value === this.theme_!.secondaryColor!.value &&
++              preset.accent.value === this.theme_!.accentColor!.value);
++      if (presetIndex !== -1) {
++        return {type: ColorType.PRESET, presetIndex};
++      }
++    }
+     return {type: ColorType.CUSTOM};
+   }
+ 
+@@ -209,6 +222,11 @@ export class ThemeColorPickerElement extends ThemeColorPickerElementBase {
+     return selected ? '0' : '-1';
+   }
+ 
++  protected isSavedPresetSelected_(index: number): boolean {
++    return this.selectedColor_.type === ColorType.PRESET &&
++        this.selectedColor_.presetIndex === index;
++  }
++
+   protected onDefaultColorClick_() {
+     if (this.handleClickForManagedColors_()) {
+       return;
+@@ -239,22 +257,42 @@ export class ThemeColorPickerElement extends ThemeColorPickerElementBase {
+       return;
+     }
+ 
+-    this.$.hueSlider.showAt(this.$.colorPickerIcon);
++    // NBrowser: always seed the dialog with the browser's actual current
++    // colors before showing it, regardless of whether that theme happens to
++    // be exact-hex already (updateCustomColor_() only pushes when it is).
++    // Otherwise the three fields open holding their {value: 0} placeholder
++    // default - e.g. right after picking a Chrome preset - which reads as
++    // "unset" both to the picker UI and to commit_()'s all-three-set gate,
++    // so the first couple of edits silently do nothing.
++    if (this.theme_) {
++      this.syncExactHexDialogColors_();
++    }
++    this.$.exactHexDialog.showAt(this.$.colorPickerIcon);
+   }
+ 
+-  protected onSelectedHueChanged_() {
+-    const selectedHue = this.$.hueSlider.selectedHue;
+-    if (this.theme_ && this.theme_.seedColorHue === selectedHue) {
+-      return;
+-    }
++  protected onExactHexColorsChanged_(
++      e: CustomEvent<{primary: SkColor, secondary: SkColor, accent: SkColor}>) {
++    this.handler_.setExactHexColors(
++        e.detail.primary, e.detail.secondary, e.detail.accent);
++  }
+ 
+-    browserProxyFactory.getInstance().handler.setSeedColorFromHue(selectedHue);
++  private syncExactHexDialogColors_() {
++    assert(this.theme_);
++    // Always the truthful, currently-rendered colors (see
++    // current_primary_color's comment in the .mojom) - never the single raw
++    // seed color a Chrome preset was generated from, and never unset/0 for
++    // Default or Grey.
++    this.$.exactHexDialog.primaryColor = this.theme_.currentPrimaryColor;
++    this.$.exactHexDialog.secondaryColor = this.theme_.currentSecondaryColor;
++    this.$.exactHexDialog.accentColor = this.theme_.currentAccentColor;
+   }
+ 
+   private updateCustomColor_() {
+-    // We only change the custom color when theme updates to a new custom color
+-    // so that the picked color persists while clicking on other color circles.
+-    if (!this.isCustomColorSelected_) {
++    // We only change the custom color when theme updates to a new custom or
++    // preset color (both are exact-hex mode under the hood) so that the
++    // picked color persists while clicking on other color circles.
++    if (this.selectedColor_.type !== ColorType.CUSTOM &&
++        this.selectedColor_.type !== ColorType.PRESET) {
+       return;
+     }
+     assert(this.theme_);
+@@ -265,7 +303,7 @@ export class ThemeColorPickerElement extends ThemeColorPickerElementBase {
+     };
+     this.$.colorPickerIcon.style.setProperty(
+         'background-color', skColorToRgba(this.theme_.colorPickerIconColor));
+-    this.$.hueSlider.selectedHue = this.theme_.seedColorHue;
++    this.syncExactHexDialogColors_();
+   }
+ 
+   private async updateColors_() {
+@@ -274,6 +312,37 @@ export class ThemeColorPickerElement extends ThemeColorPickerElementBase {
+         (await this.handler_.getChromeColors(this.theme_.isDarkMode)).colors;
+   }
+ 
++  /** Called by appearance.ts after saving a new preset. */
++  async refreshSavedPresets() {
++    this.savedPresets_ = (await this.handler_.getSavedColorPresets()).presets;
++  }
++
++  protected onSavedPresetClick_(e: Event) {
++    if (this.handleClickForManagedColors_()) {
++      return;
++    }
++    const index =
++        Number.parseInt((e.currentTarget as HTMLElement).dataset['index']!, 10);
++    const preset = this.savedPresets_[index]!;
++    this.handler_.setExactHexColors(
++        preset.primary, preset.secondary, preset.accent);
++  }
++
++  protected onSavedPresetDeleteClick_(e: Event) {
++    const index = Number.parseInt(
++        (e.currentTarget as HTMLElement).dataset['index']!, 10);
++    this.handler_.deleteColorPreset(index);
++    this.refreshSavedPresets();
++  }
++
++  protected onChromeColorDeleteClick_(e: Event) {
++    const index = Number.parseInt(
++        (e.currentTarget as HTMLElement).dataset['index']!, 10);
++    const color = this.colors_[index]!;
++    this.handler_.hideChromeColor(color.seed);
++    this.updateColors_();
++  }
++
+   protected onManagedDialogClose_() {
+     this.showManagedDialog_ = false;
+   }
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/theme_color_swatch_field.css b/ui/webui/resources/cr_components/theme_color_picker/theme_color_swatch_field.css
+new file mode 100644
+index 0000000000..fd470fb804
+--- /dev/null
++++ b/ui/webui/resources/cr_components/theme_color_picker/theme_color_swatch_field.css
+@@ -0,0 +1,97 @@
++/* Copyright 2024 The Chromium Authors
++ * Use of this source code is governed by a BSD-style license that can be
++ * found in the LICENSE file. */
++
++/* #css_wrapper_metadata_start
++ * #type=style-lit
++ * #scheme=relative
++ * #css_wrapper_metadata_end */
++
++:host {
++  display: block;
++}
++
++#row {
++  align-items: center;
++  cursor: pointer;
++  display: flex;
++  gap: 8px;
++}
++
++#swatch {
++  border: 1px solid var(--cr-fallback-color-outline, rgba(0, 0, 0, 0.2));
++  border-radius: 6px;
++  flex-shrink: 0;
++  height: 20px;
++  width: 20px;
++}
++
++#input {
++  flex: 1;
++  --cr-input-font-family: monospace;
++}
++
++#picker {
++  margin-block-start: 12px;
++}
++
++.sv-area {
++  background-color: hsl(var(--hue), 100%, 50%);
++  background-image:
++      linear-gradient(to top, black, transparent),
++      linear-gradient(to right, white, transparent);
++  border-radius: 8px;
++  height: 120px;
++  position: relative;
++  touch-action: none;
++  width: 100%;
++}
++
++.sv-handle {
++  border: solid 2px white;
++  border-radius: 50%;
++  box-shadow: var(--cr-elevation-1);
++  box-sizing: border-box;
++  height: 14px;
++  pointer-events: none;
++  position: absolute;
++  transform: translate(-50%, -50%);
++  width: 14px;
++}
++
++#hueSlider {
++  display: block;
++  margin-block-start: 12px;
++  width: 100%;
++  --cr-slider-active-color: transparent;
++  --cr-slider-ripple-color: var(--cr-active-background-color);
++  --cr-slider-ripple-opacity: 0;
++  --cr-slider-ripple-size: 32px;
++}
++
++#hueSlider::part(container) {
++  background: linear-gradient(to right,
++      hsl(0, 100%, 50%), hsl(60, 100%, 50%), hsl(120, 100%, 50%),
++      hsl(180, 100%, 50%), hsl(240, 100%, 50%), hsl(300, 100%, 50%),
++      hsl(360, 100%, 50%));
++  border: 0;
++  border-radius: 4px;
++  height: 8px;
++}
++
++#hueSlider::part(knob) {
++  background: transparent;
++  box-shadow: none;
++}
++
++#hueSlider::part(knob)::after {
++  background: hsl(var(--knob-hue_, 0), 100%, 50%);
++  border: solid 2px white;
++  border-radius: 50%;
++  box-shadow: var(--cr-elevation-1);
++  box-sizing: border-box;
++  content: '';
++  display: block;
++  height: 16px;
++  width: 16px;
++}
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/theme_color_swatch_field.html.ts b/ui/webui/resources/cr_components/theme_color_picker/theme_color_swatch_field.html.ts
+new file mode 100644
+index 0000000000..bc9efc9e55
+--- /dev/null
++++ b/ui/webui/resources/cr_components/theme_color_picker/theme_color_swatch_field.html.ts
+@@ -0,0 +1,42 @@
++// Copyright 2024 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++import {html} from '//resources/lit/v3_0/lit.rollup.js';
++
++import type {ThemeColorSwatchFieldElement} from './theme_color_swatch_field.js';
++
++export function getHtml(this: ThemeColorSwatchFieldElement) {
++  // clang-format off
++  return html`
++<div id="row" @click="${this.onSwatchClick_}">
++  <div id="swatch" style="background-color: ${this.hex_}"></div>
++  <cr-input id="input"
++      label="${this.label}"
++      value="${this.hex_}"
++      placeholder="#000000"
++      pattern="^#?[0-9a-fA-F]{6}$"
++      ?invalid="${this.invalid_}"
++      error-message="${this.errorMessage}"
++      @change="${this.onHexChange_}"
++      @click="${this.onInputClick_}">
++  </cr-input>
++</div>
++<div id="picker" ?hidden="${!this.expanded}">
++  <div id="svArea" class="sv-area" style="--hue: ${this.hsv_.h}"
++      @pointerdown="${this.onSvPointerdown_}"
++      @pointermove="${this.onSvPointermove_}"
++      @pointerup="${this.onSvPointerup_}">
++    <div id="svHandle" class="sv-handle"
++        style="left: ${this.hsv_.s}%; top: ${100 - this.hsv_.v}%">
++    </div>
++  </div>
++  <cr-slider id="hueSlider" min="0" max="359" .value="${this.hsv_.h}"
++      .style="--knob-hue_: ${this.hsv_.h}"
++      @cr-slider-value-changed="${this.onCrSliderValueChanged_}"
++      @pointerup="${this.onHueSliderPointerup_}"
++      @keyup="${this.onHueSliderKeyup_}">
++  </cr-slider>
++</div>`;
++  // clang-format on
++}
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/theme_color_swatch_field.ts b/ui/webui/resources/cr_components/theme_color_picker/theme_color_swatch_field.ts
+new file mode 100644
+index 0000000000..059b1736ba
+--- /dev/null
++++ b/ui/webui/resources/cr_components/theme_color_picker/theme_color_swatch_field.ts
+@@ -0,0 +1,311 @@
++// Copyright 2024 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++import '//resources/cr_elements/cr_input/cr_input.js';
++import '//resources/cr_elements/cr_slider/cr_slider.js';
++
++import type {CrInputElement} from '//resources/cr_elements/cr_input/cr_input.js';
++import type {CrSliderElement} from '//resources/cr_elements/cr_slider/cr_slider.js';
++import {hexColorToSkColor, skColorToHexColor} from '//resources/js/color_utils.js';
++import {CrLitElement} from '//resources/lit/v3_0/lit.rollup.js';
++import type {PropertyValues} from '//resources/lit/v3_0/lit.rollup.js';
++import type {SkColor} from '//resources/mojo/skia/public/mojom/skcolor.mojom-webui.js';
++
++import {getCss} from './theme_color_swatch_field.css.js';
++import {getHtml} from './theme_color_swatch_field.html.js';
++
++const EMPTY_SK_COLOR: SkColor = {
++  value: 0,
++};
++
++interface Hsv {
++  h: number;  // 0-360
++  s: number;  // 0-100
++  v: number;  // 0-100
++}
++
++/** Lowercases and adds a leading '#' if missing, for hexColorToSkColor(). */
++function normalizeHex(hex: string): string {
++  const trimmed = hex.trim().toLowerCase();
++  return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
++}
++
++function rgbToHsv(r: number, g: number, b: number): Hsv {
++  r /= 255;
++  g /= 255;
++  b /= 255;
++  const max = Math.max(r, g, b);
++  const min = Math.min(r, g, b);
++  const delta = max - min;
++  let h = 0;
++  if (delta !== 0) {
++    if (max === r) {
++      h = ((g - b) / delta) % 6;
++    } else if (max === g) {
++      h = (b - r) / delta + 2;
++    } else {
++      h = (r - g) / delta + 4;
++    }
++    h *= 60;
++    if (h < 0) {
++      h += 360;
++    }
++  }
++  const s = max === 0 ? 0 : (delta / max) * 100;
++  const v = max * 100;
++  return {h, s, v};
++}
++
++function hsvToRgb(hsv: Hsv): {r: number, g: number, b: number} {
++  const s = hsv.s / 100;
++  const v = hsv.v / 100;
++  const c = v * s;
++  const x = c * (1 - Math.abs((hsv.h / 60) % 2 - 1));
++  const m = v - c;
++  let r = 0, g = 0, b = 0;
++  if (hsv.h < 60) {
++    r = c;
++    g = x;
++  } else if (hsv.h < 120) {
++    r = x;
++    g = c;
++  } else if (hsv.h < 180) {
++    g = c;
++    b = x;
++  } else if (hsv.h < 240) {
++    g = x;
++    b = c;
++  } else if (hsv.h < 300) {
++    r = x;
++    b = c;
++  } else {
++    r = c;
++    b = x;
++  }
++  return {
++    r: Math.round((r + m) * 255),
++    g: Math.round((g + m) * 255),
++    b: Math.round((b + m) * 255),
++  };
++}
++
++function skColorToHsv(color: SkColor): Hsv {
++  return rgbToHsv(
++      (color.value >> 16) & 0xff, (color.value >> 8) & 0xff,
++      color.value & 0xff);
++}
++
++function hsvToSkColor(hsv: Hsv): SkColor {
++  const {r, g, b} = hsvToRgb(hsv);
++  return {value: 0xff000000 + (r << 16) + (g << 8) + b};
++}
++
++function clamp(value: number, min: number, max: number): number {
++  return Math.min(max, Math.max(min, value));
++}
++
++export interface ThemeColorSwatchFieldElement {
++  $: {
++    input: CrInputElement,
++    svArea: HTMLElement,
++    hueSlider: CrSliderElement,
++  };
++}
++
++export class ThemeColorSwatchFieldElement extends CrLitElement {
++  static get is() {
++    return 'theme-color-swatch-field';
++  }
++
++  static override get styles() {
++    return getCss();
++  }
++
++  override render() {
++    return getHtml.bind(this)();
++  }
++
++  static override get properties() {
++    return {
++      label: {type: String},
++      errorMessage: {type: String},
++
++      /* The currently committed exact color, set by the host. */
++      color: {type: Object},
++
++      /* Whether the expandable saturation/value + hue picker is open.
++       * Controlled by the host so only one field's picker is ever open at
++       * once (see theme_exact_hex_dialog.ts). */
++      expanded: {type: Boolean},
++
++      /* The text currently shown in the hex field. */
++      hex_: {type: String, state: true},
++
++      /* Whether the field currently holds invalid hex text. */
++      invalid_: {type: Boolean, state: true},
++
++      /* The HSV breakdown of the current color, driving the picker UI. */
++      hsv_: {type: Object, state: true},
++    };
++  }
++
++  accessor label: string = '';
++  accessor errorMessage: string = '';
++  accessor color: SkColor = EMPTY_SK_COLOR;
++  accessor expanded: boolean = false;
++
++  protected accessor hex_: string = '';
++  protected accessor invalid_: boolean = false;
++  protected accessor hsv_: Hsv = {h: 0, s: 0, v: 0};
++
++  private draggingSv_: boolean = false;
++
++  // The value of the last color *this field itself* committed. Used to tell
++  // apart a genuinely external color change (e.g. dialog just opened, or a
++  // preset picked elsewhere) - which should resync hsv_ from the RGB color -
++  // from our own commit echoing back down through the host/browser. Skipping
++  // resync on our own echo matters because RGB->HSV is lossy: hue can't be
++  // recovered from a near-gray/white color (saturation near 0), so blindly
++  // reconstructing hsv_ from color on every update would snap hue back to 0
++  // right as the user drags away from white/gray.
++  private lastCommittedColorValue_: number = -1;
++
++  override willUpdate(changedProperties: PropertyValues<this>) {
++    super.willUpdate(changedProperties);
++
++    // Each commit() round-trips through the browser process asynchronously
++    // and comes back down as a fresh `color` push. While the picker is open
++    // and the user may already be several drags further along, a *stale*
++    // echo of an earlier commit can otherwise arrive out of order and stomp
++    // the in-progress local state (looks like the handle "fighting back" or
++    // getting stuck). So only resync hsv_/hex_ from `color` when the field
++    // isn't actively open for editing, or on the exact tick it's opened -
++    // never while the user is mid-session with the picker expanded.
++    const justOpened = changedProperties.has('expanded') && this.expanded;
++    const colorPushed = changedProperties.has('color') &&
++        this.color.value !== 0 &&
++        this.color.value !== this.lastCommittedColorValue_;
++    if (colorPushed && (!this.expanded || justOpened)) {
++      this.hex_ = skColorToHexColor(this.color);
++      this.invalid_ = false;
++      this.hsv_ = skColorToHsv(this.color);
++      // Keep the echo-filter in sync with what hex_/hsv_ now actually show.
++      // Without this, a field whose last *local* edit happened to produce
++      // the same value some *external* selection (a saved preset, another
++      // Chrome color) later pushes again would get skipped here as a false
++      // "own echo" - even though hex_/hsv_ had since moved on to reflect a
++      // different color picked in between. That showed up as saved presets
++      // opening with 1 or 2 fields silently stuck on a stale color instead
++      // of all 3 matching the preset, depending on which roles happened to
++      // collide with an earlier local edit.
++      this.lastCommittedColorValue_ = this.color.value;
++    }
++  }
++
++  protected onSwatchClick_() {
++    this.fire('toggle-expanded');
++  }
++
++  protected onInputClick_(e: Event) {
++    // Don't let clicking directly into the text field toggle the picker.
++    e.stopPropagation();
++  }
++
++  protected onHexChange_() {
++    this.hex_ = this.$.input.value;
++    this.commitHex_();
++  }
++
++  private commitHex_() {
++    const parsed = hexColorToSkColor(normalizeHex(this.hex_));
++    this.invalid_ = this.hex_.length > 0 && parsed.value === 0;
++    if (parsed.value === 0) {
++      return;
++    }
++    this.hsv_ = skColorToHsv(parsed);
++    this.commitColor_(parsed);
++  }
++
++  // Expensive: round-trips to the browser process and repaints the whole
++  // UI. Only ever call this on a committed user action (release, Enter,
++  // typed hex) - never on every drag tick.
++  private commitColor_(color: SkColor) {
++    this.lastCommittedColorValue_ = color.value;
++    this.color = color;
++    this.fire('color-changed', {color});
++  }
++
++  private commitHsv_(hsv: Hsv) {
++    this.hsv_ = hsv;
++    const color = hsvToSkColor(hsv);
++    this.hex_ = skColorToHexColor(color);
++    this.invalid_ = false;
++    this.commitColor_(color);
++  }
++
++  // Live drag preview only (cheap: local re-render of the gradient/handle
++  // position), no browser-wide commit.
++  private previewHsv_(hsv: Hsv) {
++    this.hsv_ = hsv;
++  }
++
++  protected onCrSliderValueChanged_() {
++    const h = this.$.hueSlider.value;
++    // At Value=0 the color is black regardless of hue/saturation - moving
++    // just the hue slider from a black (or fully white, Saturation=0)
++    // starting point would otherwise have no visible effect at all, look
++    // "stuck", and commit right back to the same color on release. Reveal a
++    // vivid color instead, matching how most color pickers behave when hue
++    // is touched from black/white.
++    const v = this.hsv_.v < 5 ? 100 : this.hsv_.v;
++    const s = this.hsv_.s < 5 && this.hsv_.v < 5 ? 100 : this.hsv_.s;
++    this.previewHsv_({h, s, v});
++  }
++
++  protected onHueSliderPointerup_() {
++    this.commitHsv_(this.hsv_);
++  }
++
++  protected onHueSliderKeyup_() {
++    this.commitHsv_(this.hsv_);
++  }
++
++  protected onSvPointerdown_(e: PointerEvent) {
++    if (e.button !== 0) {
++      return;
++    }
++    this.draggingSv_ = true;
++    this.$.svArea.setPointerCapture(e.pointerId);
++    this.previewHsv_(this.hsvFromEvent_(e));
++  }
++
++  protected onSvPointermove_(e: PointerEvent) {
++    if (!this.draggingSv_) {
++      return;
++    }
++    this.previewHsv_(this.hsvFromEvent_(e));
++  }
++
++  protected onSvPointerup_(e: PointerEvent) {
++    this.draggingSv_ = false;
++    this.$.svArea.releasePointerCapture(e.pointerId);
++    this.commitHsv_(this.hsvFromEvent_(e));
++  }
++
++  private hsvFromEvent_(e: PointerEvent): Hsv {
++    const rect = this.$.svArea.getBoundingClientRect();
++    const s = clamp((e.clientX - rect.left) / rect.width, 0, 1) * 100;
++    const v = 100 - clamp((e.clientY - rect.top) / rect.height, 0, 1) * 100;
++    return {...this.hsv_, s, v};
++  }
++}
++
++customElements.define(
++    ThemeColorSwatchFieldElement.is, ThemeColorSwatchFieldElement);
++
++declare global {
++  interface HTMLElementTagNameMap {
++    'theme-color-swatch-field': ThemeColorSwatchFieldElement;
++  }
++}
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/theme_exact_hex_dialog.css b/ui/webui/resources/cr_components/theme_color_picker/theme_exact_hex_dialog.css
+new file mode 100644
+index 0000000000..ce43c6ba94
+--- /dev/null
++++ b/ui/webui/resources/cr_components/theme_color_picker/theme_exact_hex_dialog.css
+@@ -0,0 +1,58 @@
++/* Copyright 2024 The Chromium Authors
++ * Use of this source code is governed by a BSD-style license that can be
++ * found in the LICENSE file. */
++
++/* #css_wrapper_metadata_start
++ * #type=style-lit
++ * #import=//resources/cr_elements/cr_icons_lit.css.js
++ * #scheme=relative
++ * #include=cr-icons-lit
++ * #css_wrapper_metadata_end */
++
++dialog {
++  background: var(--color-theme-color-picker-hue-slider-dialog-background,
++      var(--cr-fallback-color-surface));
++  border: 0;
++  border-radius: 12px;
++  box-shadow: var(--cr-elevation-3);
++  box-sizing: border-box;
++  color: var(--color-theme-color-picker-hue-slider-dialog-foreground,
++      var(--cr-fallback-color-on-surface));
++  overflow: hidden;
++  margin: 0;
++  padding: 0;
++  width: 280px;
++}
++
++@media (forced-colors: active) {
++  dialog {
++    border: solid 1px Highlight;
++  }
++}
++
++#contentsWrapper {
++  padding: 20px;
++  display: flex;
++  flex-direction: column;
++  gap: 12px;
++}
++
++#header {
++  display: flex;
++  align-items: center;
++  height: 24px;
++  gap: 8px;
++}
++
++h2 {
++  flex: 1;
++  font-size: 16px;
++  font-weight: 500;
++  margin: 0;
++}
++
++cr-icon-button {
++  color: var(--color-theme-color-picker-hue-slider-dialog-icon,
++      var(--cr-fallback-color-on-surface-subtle));
++  margin-inline-end: -6px;
++}
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/theme_exact_hex_dialog.html.ts b/ui/webui/resources/cr_components/theme_color_picker/theme_exact_hex_dialog.html.ts
+new file mode 100644
+index 0000000000..05dfe25164
+--- /dev/null
++++ b/ui/webui/resources/cr_components/theme_color_picker/theme_exact_hex_dialog.html.ts
+@@ -0,0 +1,50 @@
++// Copyright 2024 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++import {html} from '//resources/lit/v3_0/lit.rollup.js';
++
++import type {ThemeExactHexDialogElement} from './theme_exact_hex_dialog.js';
++
++export function getHtml(this: ThemeExactHexDialogElement) {
++  // clang-format off
++  return html`
++<dialog id="dialog">
++  <div id="contentsWrapper">
++    <div id="header">
++      <h2 id="title">${this.i18n('hexColorDialogTitle')}</h2>
++      <slot name="headerSuffix"></slot>
++      <cr-icon-button id="close" class="icon-clear"
++          aria-label="${this.i18n('close')}"
++          title="${this.i18n('close')}"
++          @click="${this.onHideClick_}">
++      </cr-icon-button>
++    </div>
++    <theme-color-swatch-field
++        .label="${this.i18n('hexColorPrimaryLabel')}"
++        .errorMessage="${this.i18n('hexColorInvalidError')}"
++        .color="${this.primaryColor}"
++        ?expanded="${this.expandedField_ === 'primary'}"
++        @toggle-expanded="${this.onPrimaryToggleExpanded_}"
++        @color-changed="${this.onPrimaryColorChanged_}">
++    </theme-color-swatch-field>
++    <theme-color-swatch-field
++        .label="${this.i18n('hexColorSecondaryLabel')}"
++        .errorMessage="${this.i18n('hexColorInvalidError')}"
++        .color="${this.secondaryColor}"
++        ?expanded="${this.expandedField_ === 'secondary'}"
++        @toggle-expanded="${this.onSecondaryToggleExpanded_}"
++        @color-changed="${this.onSecondaryColorChanged_}">
++    </theme-color-swatch-field>
++    <theme-color-swatch-field
++        .label="${this.i18n('hexColorAccentLabel')}"
++        .errorMessage="${this.i18n('hexColorInvalidError')}"
++        .color="${this.accentColor}"
++        ?expanded="${this.expandedField_ === 'accent'}"
++        @toggle-expanded="${this.onAccentToggleExpanded_}"
++        @color-changed="${this.onAccentColorChanged_}">
++    </theme-color-swatch-field>
++  </div>
++</dialog>`;
++  // clang-format on
++}
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/theme_exact_hex_dialog.ts b/ui/webui/resources/cr_components/theme_color_picker/theme_exact_hex_dialog.ts
+new file mode 100644
+index 0000000000..4bace38f6b
+--- /dev/null
++++ b/ui/webui/resources/cr_components/theme_color_picker/theme_exact_hex_dialog.ts
+@@ -0,0 +1,170 @@
++// Copyright 2024 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++import '//resources/cr_elements/cr_icon_button/cr_icon_button.js';
++import './theme_color_swatch_field.js';
++
++import {I18nMixinLit} from '//resources/cr_elements/i18n_mixin_lit.js';
++import {EventTracker} from '//resources/js/event_tracker.js';
++import {CrLitElement} from '//resources/lit/v3_0/lit.rollup.js';
++import type {SkColor} from '//resources/mojo/skia/public/mojom/skcolor.mojom-webui.js';
++
++import {getCss} from './theme_exact_hex_dialog.css.js';
++import {getHtml} from './theme_exact_hex_dialog.html.js';
++
++const EMPTY_SK_COLOR: SkColor = {
++  value: 0,
++};
++
++export interface ThemeExactHexDialogElement {
++  $: {
++    contentsWrapper: HTMLElement,
++    dialog: HTMLDialogElement,
++  };
++}
++
++const ThemeExactHexDialogElementBase = I18nMixinLit(CrLitElement);
++
++export class ThemeExactHexDialogElement extends
++    ThemeExactHexDialogElementBase {
++  static get is() {
++    return 'cr-theme-exact-hex-dialog';
++  }
++
++  static override get styles() {
++    return getCss();
++  }
++
++  override render() {
++    return getHtml.bind(this)();
++  }
++
++  static override get properties() {
++    return {
++      /* The currently committed exact colors, set by the host. */
++      primaryColor: {type: Object},
++      secondaryColor: {type: Object},
++      accentColor: {type: Object},
++
++      /* Which field's saturation/value + hue picker is open, if any. Only
++       * one is ever expanded at a time. */
++      expandedField_: {type: String, state: true},
++    };
++  }
++
++  accessor primaryColor: SkColor = EMPTY_SK_COLOR;
++  accessor secondaryColor: SkColor = EMPTY_SK_COLOR;
++  accessor accentColor: SkColor = EMPTY_SK_COLOR;
++
++  protected accessor expandedField_: 'primary'|'secondary'|'accent'|null =
++      null;
++
++  private eventTracker_: EventTracker = new EventTracker();
++
++  showAt(anchor: HTMLElement) {
++    this.$.dialog.showModal();
++
++    const anchorRect = anchor.getBoundingClientRect();
++    const dialogWidth = this.$.dialog.offsetWidth;
++    const dialogHeight = this.$.dialog.offsetHeight;
++    const margin = 8;
++
++    // Center horizontally on the anchor, then clamp so the dialog never
++    // runs off either edge of the (often narrow) side panel viewport.
++    const centeredLeft =
++        anchorRect.left + anchorRect.width / 2 - dialogWidth / 2;
++    const left = Math.min(
++        Math.max(centeredLeft, margin),
++        window.innerWidth - dialogWidth - margin);
++    this.$.dialog.style.left = `${left}px`;
++
++    // Always show below the anchor; only flip above it if there's truly no
++    // room below but there is room above.
++    let top = anchorRect.bottom;
++    if (top + dialogHeight > window.innerHeight - margin &&
++        anchorRect.top - dialogHeight >= margin) {
++      top = anchorRect.top - dialogHeight;
++    }
++    top = Math.min(
++        Math.max(top, margin), window.innerHeight - dialogHeight - margin);
++    this.$.dialog.style.top = `${top}px`;
++
++    this.eventTracker_.add(
++        this.$.dialog, 'pointerdown', this.onPointerdown_.bind(this));
++  }
++
++  hide() {
++    this.$.dialog.close();
++    this.eventTracker_.removeAll();
++    this.expandedField_ = null;
++  }
++
++  private onPointerdown_(e: PointerEvent) {
++    if (e.button !== 0 || e.composedPath()[0]! !== this.$.dialog) {
++      return;
++    }
++
++    this.hide();
++  }
++
++  protected onHideClick_() {
++    this.hide();
++  }
++
++  protected onPrimaryToggleExpanded_() {
++    this.expandedField_ =
++        this.expandedField_ === 'primary' ? null : 'primary';
++  }
++
++  protected onSecondaryToggleExpanded_() {
++    this.expandedField_ =
++        this.expandedField_ === 'secondary' ? null : 'secondary';
++  }
++
++  protected onAccentToggleExpanded_() {
++    this.expandedField_ = this.expandedField_ === 'accent' ? null : 'accent';
++  }
++
++  protected onPrimaryColorChanged_(e: CustomEvent<{color: SkColor}>) {
++    this.primaryColor = e.detail.color;
++    this.commit_();
++  }
++
++  protected onSecondaryColorChanged_(e: CustomEvent<{color: SkColor}>) {
++    this.secondaryColor = e.detail.color;
++    this.commit_();
++  }
++
++  protected onAccentColorChanged_(e: CustomEvent<{color: SkColor}>) {
++    this.accentColor = e.detail.color;
++    this.commit_();
++  }
++
++  /**
++   * Fires 'exact-hex-colors-changed' once all three colors are set. Each
++   * theme-color-swatch-field independently validates and parses its own
++   * hex/HSV input before firing 'color-changed', so by the time we get
++   * here every color received is already known-valid.
++   */
++  private commit_() {
++    if (this.primaryColor.value === 0 || this.secondaryColor.value === 0 ||
++        this.accentColor.value === 0) {
++      return;
++    }
++    this.fire('exact-hex-colors-changed', {
++      primary: this.primaryColor,
++      secondary: this.secondaryColor,
++      accent: this.accentColor,
++    });
++  }
++}
++
++customElements.define(
++    ThemeExactHexDialogElement.is, ThemeExactHexDialogElement);
++
++declare global {
++  interface HTMLElementTagNameMap {
++    'cr-theme-exact-hex-dialog': ThemeExactHexDialogElement;
++  }
++}
