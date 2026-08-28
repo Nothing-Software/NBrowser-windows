@@ -37,3 +37,4 @@ nbrowser/windows/windows-nbrowser-theme-exact-color-engine.patch
 nbrowser/windows/windows-nbrowser-theme-service-exact-hex.patch
 nbrowser/windows/windows-nbrowser-theme-mojom-handler.patch
 nbrowser/windows/windows-nbrowser-theme-picker-ui.patch
+nbrowser/windows/windows-nbrowser-theme-picker-l10n.patch
