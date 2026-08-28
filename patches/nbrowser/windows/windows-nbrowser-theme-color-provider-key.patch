@@ -1,0 +1,39 @@
+diff --git a/ui/color/color_provider_key.h b/ui/color/color_provider_key.h
+index 82d22fb46c..f547049f51 100644
+--- a/ui/color/color_provider_key.h
++++ b/ui/color/color_provider_key.h
+@@ -76,6 +76,9 @@ struct COMPONENT_EXPORT(COLOR_PROVIDER_KEY) ColorProviderKey {
+     kBaseline,
+     kGrayscale,
+     kAccent,
++    // Primary/secondary/accent are each set to an exact user-provided color
++    // rather than derived from a single seed's hue (NBrowser custom theming).
++    kExactHex,
+   };
+ 
+   class COMPONENT_EXPORT(COLOR_PROVIDER_KEY) InitializerSupplier {
+@@ -135,6 +138,10 @@ struct COMPONENT_EXPORT(COLOR_PROVIDER_KEY) ColorProviderKey {
+   FrameStyle frame_style = FrameStyle::kDefault;
+   UserColorSource user_color_source = UserColorSource::kAccent;
+   std::optional<SkColor> user_color = std::nullopt;
++  // Only used when `user_color_source` is `kExactHex`: independent exact
++  // colors for the secondary and accent (tertiary) roles.
++  std::optional<SkColor> user_color_secondary = std::nullopt;
++  std::optional<SkColor> user_color_accent = std::nullopt;
+   std::optional<SchemeVariant> scheme_variant = std::nullopt;
+   scoped_refptr<ThemeInitializerSupplier> custom_theme = nullptr;
+   // Only dereferenced when populating the ColorMixer. After that, used to
+@@ -147,10 +154,12 @@ struct COMPONENT_EXPORT(COLOR_PROVIDER_KEY) ColorProviderKey {
+     auto* rhs_app_controller = other.app_controller.get();
+     return std::tie(color_mode, contrast_mode, forced_colors, system_theme,
+                     frame_type, frame_style, user_color_source, user_color,
+-                    scheme_variant, custom_theme, lhs_app_controller) <
++                    user_color_secondary, user_color_accent, scheme_variant,
++                    custom_theme, lhs_app_controller) <
+            std::tie(other.color_mode, other.contrast_mode, other.forced_colors,
+                     other.system_theme, other.frame_type, other.frame_style,
+                     other.user_color_source, other.user_color,
++                    other.user_color_secondary, other.user_color_accent,
+                     other.scheme_variant, other.custom_theme,
+                     rhs_app_controller);
+   }

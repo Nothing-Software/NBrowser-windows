@@ -1,0 +1,302 @@
+diff --git a/chrome/browser/ui/webui/cr_components/theme_color_picker/theme_color_picker_handler.cc b/chrome/browser/ui/webui/cr_components/theme_color_picker/theme_color_picker_handler.cc
+index 200197c459..512596f4fa 100644
+--- a/chrome/browser/ui/webui/cr_components/theme_color_picker/theme_color_picker_handler.cc
++++ b/chrome/browser/ui/webui/cr_components/theme_color_picker/theme_color_picker_handler.cc
+@@ -4,9 +4,11 @@
+ 
+ #include "chrome/browser/ui/webui/cr_components/theme_color_picker/theme_color_picker_handler.h"
+ 
++#include <algorithm>
+ #include <limits>
+ 
+ #include "base/containers/fixed_flat_map.h"
++#include "base/values.h"
+ #include "chrome/browser/new_tab_page/chrome_colors/generated_colors_info.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/themes/theme_service.h"
+@@ -90,6 +92,8 @@ ThemeColorPickerHandler::~ThemeColorPickerHandler() = default;
+ void ThemeColorPickerHandler::RegisterProfilePrefs(
+     PrefRegistrySimple* registry) {
+   registry->RegisterIntegerPref(prefs::kSeedColorChangeCount, 0);
++  registry->RegisterListPref(prefs::kSavedExactHexColorPresets);
++  registry->RegisterListPref(prefs::kHiddenChromeColorSeeds);
+ }
+ 
+ void ThemeColorPickerHandler::SetDefaultColor() {
+@@ -116,16 +120,47 @@ void ThemeColorPickerHandler::SetSeedColorFromHue(float hue) {
+   SetSeedColor(HueToSkColor(hue), ui::mojom::BrowserColorVariant::kTonalSpot);
+ }
+ 
++void ThemeColorPickerHandler::SetExactHexColors(SkColor primary,
++                                                SkColor secondary,
++                                                SkColor accent) {
++  theme_service_->SetExactHexColors(primary, secondary, accent);
++  theme_service_->UseDeviceTheme(false);
++  MaybeIncrementSeedColorChangeCount();
++}
++
+ void ThemeColorPickerHandler::GetChromeColors(
+     bool is_dark_mode,
+     GetChromeColorsCallback callback) {
++  const base::ListValue& hidden_seeds =
++      profile_->GetPrefs()->GetList(prefs::kHiddenChromeColorSeeds);
+   std::vector<theme_color_picker::mojom::ChromeColorPtr> colors;
+   for (const auto& color_info : kDynamicCustomizeChromeColors) {
++    const int seed = static_cast<int>(color_info.color);
++    const bool is_hidden = std::ranges::any_of(
++        hidden_seeds, [seed](const base::Value& hidden_seed) {
++          return hidden_seed.GetIfInt() == std::make_optional(seed);
++        });
++    if (is_hidden) {
++      continue;
++    }
+     colors.push_back(CreateDynamicChromeColor(color_info, is_dark_mode));
+   }
+   std::move(callback).Run(std::move(colors));
+ }
+ 
++void ThemeColorPickerHandler::HideChromeColor(SkColor seed) {
++  ScopedListPrefUpdate update(profile_->GetPrefs(),
++                              prefs::kHiddenChromeColorSeeds);
++  const int seed_int = static_cast<int>(seed);
++  const bool already_hidden = std::ranges::any_of(
++      *update, [seed_int](const base::Value& hidden_seed) {
++        return hidden_seed.GetIfInt() == std::make_optional(seed_int);
++      });
++  if (!already_hidden) {
++    update->Append(seed_int);
++  }
++}
++
+ void ThemeColorPickerHandler::RemoveBackgroundImage() {
+   if (ntp_custom_background_service_) {
+     ntp_custom_background_service_->ResetCustomBackgroundInfo();
+@@ -148,7 +183,9 @@ void ThemeColorPickerHandler::UpdateTheme() {
+         *custom_background->custom_background_main_color;
+   }
+ 
+-  theme->follow_device_theme = theme_service_->UsingDeviceTheme();
++  // NBrowser: ThemeService::UsingDeviceTheme() is hardcoded to false now
++  // that the "Follow device colors" UI is gone, so this is always false too.
++  theme->follow_device_theme = false;
+ 
+   auto* native_theme = ui::NativeTheme::GetInstanceForNativeUi();
+   CHECK(native_theme);
+@@ -186,6 +223,24 @@ void ThemeColorPickerHandler::UpdateTheme() {
+   theme->seed_color_hue = hsl.h * 360;
+   theme->is_grey_baseline = theme_service_->GetIsGrayscale();
+   theme->browser_color_variant = theme_service_->GetBrowserColorVariant();
++  if (theme_service_->GetIsExactHex()) {
++    theme->secondary_color = theme_service_->GetUserColorSecondary();
++    theme->accent_color = theme_service_->GetUserColorAccent();
++  }
++
++  // NBrowser: a truthful snapshot of what's actually currently rendered,
++  // for the custom-color dialog to seed itself from - these are the exact
++  // same ColorIds AddExactHexOverrideColorMixer() writes literal
++  // primary/secondary/accent into, so in exact-hex mode this round-trips
++  // the committed hex values bit for bit; in any other mode (a Chrome color
++  // preset, Default, Grey) it reflects the real derived tones instead of
++  // the single raw seed color or an unset 0.
++  const auto& color_provider = web_contents_->GetColorProvider();
++  theme->current_primary_color = color_provider.GetColor(kColorToolbar);
++  theme->current_secondary_color =
++      color_provider.GetColor(ui::kColorFrameActive);
++  theme->current_accent_color =
++      color_provider.GetColor(ui::kColorButtonBackgroundProminent);
+ 
+   if (!theme_service_->UsingDefaultTheme() &&
+       !theme_service_->UsingSystemTheme()) {
+@@ -199,6 +254,79 @@ void ThemeColorPickerHandler::UpdateTheme() {
+   client_->SetTheme(std::move(theme));
+ }
+ 
++void ThemeColorPickerHandler::SaveCurrentColorPreset() {
++  if (!theme_service_->GetIsExactHex()) {
++    return;
++  }
++  std::optional<SkColor> primary = theme_service_->GetUserColor();
++  std::optional<SkColor> secondary = theme_service_->GetUserColorSecondary();
++  std::optional<SkColor> accent = theme_service_->GetUserColorAccent();
++  if (!primary.has_value() || !secondary.has_value() ||
++      !accent.has_value()) {
++    return;
++  }
++
++  ScopedListPrefUpdate update(profile_->GetPrefs(),
++                              prefs::kSavedExactHexColorPresets);
++  const bool already_saved = std::ranges::any_of(
++      *update, [&](const base::Value& entry) {
++        if (!entry.is_dict()) {
++          return false;
++        }
++        const base::DictValue& dict = entry.GetDict();
++        return dict.FindInt("primary") == std::make_optional(
++                                               static_cast<int>(
++                                                   primary.value())) &&
++               dict.FindInt("secondary") ==
++                   std::make_optional(static_cast<int>(secondary.value())) &&
++               dict.FindInt("accent") ==
++                   std::make_optional(static_cast<int>(accent.value()));
++      });
++  if (already_saved) {
++    return;
++  }
++
++  base::DictValue preset;
++  preset.Set("primary", static_cast<int>(primary.value()));
++  preset.Set("secondary", static_cast<int>(secondary.value()));
++  preset.Set("accent", static_cast<int>(accent.value()));
++  update->Append(std::move(preset));
++}
++
++void ThemeColorPickerHandler::GetSavedColorPresets(
++    GetSavedColorPresetsCallback callback) {
++  std::vector<theme_color_picker::mojom::ColorPresetPtr> presets;
++  for (const base::Value& entry :
++       profile_->GetPrefs()->GetList(prefs::kSavedExactHexColorPresets)) {
++    if (!entry.is_dict()) {
++      continue;
++    }
++    const base::DictValue& dict = entry.GetDict();
++    std::optional<int> primary = dict.FindInt("primary");
++    std::optional<int> secondary = dict.FindInt("secondary");
++    std::optional<int> accent = dict.FindInt("accent");
++    if (!primary.has_value() || !secondary.has_value() ||
++        !accent.has_value()) {
++      continue;
++    }
++    auto preset = theme_color_picker::mojom::ColorPreset::New();
++    preset->primary = static_cast<SkColor>(primary.value());
++    preset->secondary = static_cast<SkColor>(secondary.value());
++    preset->accent = static_cast<SkColor>(accent.value());
++    presets.push_back(std::move(preset));
++  }
++  std::move(callback).Run(std::move(presets));
++}
++
++void ThemeColorPickerHandler::DeleteColorPreset(uint32_t index) {
++  ScopedListPrefUpdate update(profile_->GetPrefs(),
++                              prefs::kSavedExactHexColorPresets);
++  if (index >= update->size()) {
++    return;
++  }
++  update->erase(update->begin() + index);
++}
++
+ void ThemeColorPickerHandler::MaybeIncrementSeedColorChangeCount() {
+   if (!seed_color_changed_) {
+     const auto count =
+diff --git a/chrome/browser/ui/webui/cr_components/theme_color_picker/theme_color_picker_handler.h b/chrome/browser/ui/webui/cr_components/theme_color_picker/theme_color_picker_handler.h
+index 2a4ccb727c..7c26abedb9 100644
+--- a/chrome/browser/ui/webui/cr_components/theme_color_picker/theme_color_picker_handler.h
++++ b/chrome/browser/ui/webui/cr_components/theme_color_picker/theme_color_picker_handler.h
+@@ -52,10 +52,17 @@ class ThemeColorPickerHandler
+   void SetSeedColor(SkColor seed_color,
+                     ui::mojom::BrowserColorVariant variant) override;
+   void SetSeedColorFromHue(float hue) override;
++  void SetExactHexColors(SkColor primary,
++                         SkColor secondary,
++                         SkColor accent) override;
+   void GetChromeColors(bool is_dark_mode,
+                        GetChromeColorsCallback callback) override;
+   void RemoveBackgroundImage() override;
+   void UpdateTheme() override;
++  void SaveCurrentColorPreset() override;
++  void GetSavedColorPresets(GetSavedColorPresetsCallback callback) override;
++  void DeleteColorPreset(uint32_t index) override;
++  void HideChromeColor(SkColor seed) override;
+ 
+  private:
+   void MaybeIncrementSeedColorChangeCount();
+diff --git a/ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.mojom b/ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.mojom
+index 133b3f979b..5534a4114a 100644
+--- a/ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.mojom
++++ b/ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.mojom
+@@ -21,6 +21,21 @@ struct Theme {
+   skia.mojom.SkColor seed_color;
+   // The hue of the color this theme was calculated from.
+   float seed_color_hue;
++  // The exact secondary color, only set when using independent
++  // primary/secondary/accent custom theming.
++  skia.mojom.SkColor? secondary_color;
++  // The exact accent color, only set when using independent
++  // primary/secondary/accent custom theming.
++  skia.mojom.SkColor? accent_color;
++  // Snapshot of the browser's actual currently-rendered primary/secondary/
++  // accent colors (read straight from the live ColorProvider), always set
++  // regardless of theme mode. Used to seed the custom-color dialog with a
++  // sensible, truthful starting point - e.g. the real derived tones of a
++  // Chrome color preset rather than its single raw seed color repeated
++  // three times, or the real default/grey colors instead of an unset 0.
++  skia.mojom.SkColor current_primary_color;
++  skia.mojom.SkColor current_secondary_color;
++  skia.mojom.SkColor current_accent_color;
+   // The current theme background color.
+   skia.mojom.SkColor background_color;
+   // The current theme foreground color. If not set, we use the default theme.
+@@ -52,6 +67,14 @@ struct ChromeColor {
+   ui.mojom.BrowserColorVariant variant;
+ };
+ 
++// A user-saved independent primary/secondary/accent color preset (NBrowser
++// custom theming).
++struct ColorPreset {
++  skia.mojom.SkColor primary;
++  skia.mojom.SkColor secondary;
++  skia.mojom.SkColor accent;
++};
++
+ // Used by the WebUI page to bootstrap bidirectional communication.
+ interface ThemeColorPickerHandlerFactory {
+   // The WebUI calls this method when the page is first initialized.
+@@ -80,8 +103,29 @@ interface ThemeColorPickerHandler {
+   // Sets a Chrome theme generated from |hue|.
+   SetSeedColorFromHue(float hue);
+ 
++  // Sets a Chrome theme with independent exact primary/secondary/accent
++  // colors, bypassing the normal single-seed color derivation.
++  SetExactHexColors(skia.mojom.SkColor primary,
++                    skia.mojom.SkColor secondary,
++                    skia.mojom.SkColor accent);
++
+   // Removes background image.
+   RemoveBackgroundImage();
++
++  // Saves the currently-applied exact primary/secondary/accent colors as a
++  // new preset. No-op if the current theme isn't using exact hex colors.
++  SaveCurrentColorPreset();
++
++  // Returns the user's saved color presets, in save order.
++  GetSavedColorPresets() => (array<ColorPreset> presets);
++
++  // Deletes the saved preset at |index| (as returned by
++  // GetSavedColorPresets()).
++  DeleteColorPreset(uint32 index);
++
++  // Permanently hides the built-in Chrome color whose seed is |seed| from
++  // GetChromeColors() for this profile. There is no way to unhide it.
++  HideChromeColor(skia.mojom.SkColor seed);
+ };
+ 
+ // WebUI-side handler for requests from the browser.
+diff --git a/chrome/common/pref_names.h b/chrome/common/pref_names.h
+index 7f2ccebd7e..a31510799b 100644
+--- a/chrome/common/pref_names.h
++++ b/chrome/common/pref_names.h
+@@ -1722,6 +1734,15 @@ inline constexpr char kNtpWallpaperSearchHistory[] =
+ // panel across NTP tabs. Incremented at most once per NTP tab.
+ inline constexpr char kSeedColorChangeCount[] =
+     "colorpicker.SeedColorChangeCount";
++// List of user-saved exact primary/secondary/accent color presets (NBrowser
++// custom theming). Each entry is a dict with integer "primary"/"secondary"/
++// "accent" SkColor keys.
++inline constexpr char kSavedExactHexColorPresets[] =
++    "colorpicker.SavedExactHexColorPresets";
++// List of int SkColor seeds for built-in Chrome color presets the user has
++// permanently hidden (NBrowser custom theming).
++inline constexpr char kHiddenChromeColorSeeds[] =
++    "colorpicker.HiddenChromeColorSeeds";
+ // Whether the NTP footer is visible.
+ inline constexpr char kNtpFooterVisible[] = "NewTabPage.FooterVisible";
+ 

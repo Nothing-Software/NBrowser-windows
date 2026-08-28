@@ -1,0 +1,202 @@
+diff --git a/chrome/browser/themes/theme_service.cc b/chrome/browser/themes/theme_service.cc
+index bf9cb4c809..c4b33ee6ff 100644
+--- a/chrome/browser/themes/theme_service.cc
++++ b/chrome/browser/themes/theme_service.cc
+@@ -297,6 +297,10 @@ void ThemeService::RegisterProfilePrefs(
+       prefs::kDeprecatedUserColorDoNotUse, SK_ColorTRANSPARENT,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterIntegerPref(prefs::kUserColor, SK_ColorTRANSPARENT);
++  registry->RegisterIntegerPref(prefs::kUserColorSecondary,
++                                SK_ColorTRANSPARENT);
++  registry->RegisterIntegerPref(prefs::kUserColorAccent, SK_ColorTRANSPARENT);
++  registry->RegisterBooleanPref(prefs::kIsExactHexTheme, false);
+   registry->RegisterIntegerPref(
+       prefs::kDeprecatedBrowserColorVariantDoNotUse,
+       static_cast<int>(ui::mojom::BrowserColorVariant::kSystem),
+@@ -471,26 +475,21 @@ void ThemeService::UseDeviceTheme(bool follow) {
+ }
+ 
+ bool ThemeService::UsingDeviceTheme() const {
+-#if BUILDFLAG(IS_CHROMEOS)
+-  const PrefService::Preference* pref = profile_->GetPrefs()->FindPreference(
+-      prefs::kBrowserFollowsSystemThemeColors);
+-  // Ensure we respect previous theme settings for an unset follow theme
+-  // value.
+-  if (pref->IsDefaultValue()) {
+-    return GetIsBaseline() && !UsingExtensionTheme();
+-  }
+-  return pref->GetValue()->GetBool();
+-#elif BUILDFLAG(IS_WIN)
+-  // Always respect the profile preference on Windows. In the default case the
+-  // preference starts disabled.
+-  return profile_->GetPrefs()
+-      ->FindPreference(prefs::kBrowserFollowsSystemThemeColors)
+-      ->GetValue()
+-      ->GetBool();
+-#else
+-  // Only ChromeOS and Windows have this toggle.
++  // NBrowser: the "Follow device colors" UI has been removed in favor of
++  // independent exact-hex theming (see GetBrowserColorScheme()). Hardcode
++  // false rather than reading `kBrowserFollowsSystemThemeColors` - that pref
++  // can still be `true` on a profile from before the toggle was removed, and
++  // every caller of this method (GetColorProviderKey(), the theme-picker and
++  // customize-chrome mojom handlers, browser_widget.cc, etc.) treats a true
++  // return as license to ignore the user's chosen colors entirely and fall
++  // back to the OS accent color. That produced a real bug: any edit to the
++  // exact-hex colors momentarily re-notified observers while the stale pref
++  // was still true, which made the color provider fall through to an unset
++  // `UserColorSource::kAccent` key (no `user_color` set) - rendering as
++  // black - before a second, corrective notification fixed it back up. A few
++  // ticks of that were enough for something downstream to latch onto the
++  // black state. Hardcoding this avoids the whole class of races.
+   return false;
+-#endif
+ }
+ 
+ bool ThemeService::IsSystemThemeDistinctFromDefaultTheme() const {
+@@ -505,9 +504,12 @@ bool ThemeService::UsingSystemTheme() const {
+   return UsingDefaultTheme();
+ }
+ 
+-void ThemeService::OnBackgroundColorExtracted(SkColor color) {
+-  SetUserColorAndBrowserColorVariant(
+-      color, ui::mojom::BrowserColorVariant::kTonalSpot);
++void ThemeService::OnBackgroundColorExtracted(SkColor /*color*/) {
++  // NBrowser: stock Chromium auto-retheming the whole browser (silently
++  // overwriting whatever theme - including independent exact-hex colors -
++  // was active) from the dominant color of any wallpaper/GIF the user
++  // uploads is unwanted here. Uploading a background image should only
++  // ever change the background image, never the theme color.
+ }
+ 
+ void ThemeService::OnNtpCustomBackgroundServiceShuttingDown() {
+@@ -669,8 +671,11 @@ void ThemeService::SetBrowserColorScheme(
+ }
+ 
+ ThemeService::BrowserColorScheme ThemeService::GetBrowserColorScheme() const {
+-  return static_cast<BrowserColorScheme>(
+-      profile_->GetPrefs()->GetInteger(prefs::kBrowserColorScheme));
++  // NBrowser: the Light/Dark/Device selector UI has been removed (custom
++  // exact-hex theming replaces it); hardcode Dark rather than reading the
++  // pref, so behavior doesn't depend on whatever value a profile happened to
++  // have stored before the selector was removed.
++  return BrowserColorScheme::kDark;
+ }
+ 
+ bool ThemeService::BrowserUsesDarkColors() const {
+@@ -714,6 +719,12 @@ ui::ColorProviderKey ThemeService::GetColorProviderKey(
+     } else if (auto user_color = GetUserColor()) {
+       key.user_color = user_color;
+     }
++
++    // user_color_secondary / user_color_accent.
++    if (GetIsExactHex()) {
++      key.user_color_secondary = GetUserColorSecondary();
++      key.user_color_accent = GetUserColorAccent();
++    }
+   }
+ 
+   // user_color_source.
+@@ -721,6 +732,9 @@ ui::ColorProviderKey ThemeService::GetColorProviderKey(
+     key.user_color_source = ui::ColorProviderKey::UserColorSource::kGrayscale;
+   } else if (UsingDeviceTheme()) {
+     key.user_color_source = ui::ColorProviderKey::UserColorSource::kAccent;
++  } else if (GetIsExactHex() && key.user_color_secondary.has_value() &&
++             key.user_color_accent.has_value()) {
++    key.user_color_source = ui::ColorProviderKey::UserColorSource::kExactHex;
+   } else if (GetIsGrayscale()) {
+     key.user_color_source = ui::ColorProviderKey::UserColorSource::kGrayscale;
+   } else if (GetIsBaseline()) {
+@@ -808,6 +822,39 @@ bool ThemeService::GetIsGrayscale() const {
+   return CurrentThemeIsGrayscale(profile_->GetPrefs());
+ }
+ 
++void ThemeService::SetExactHexColors(SkColor primary,
++                                     SkColor secondary,
++                                     SkColor accent) {
++  {
++    base::AutoReset<bool> resetter(&should_suppress_theme_updates_, true);
++    ClearThemeData(/*reset_all_settings=*/false);
++    profile_->GetPrefs()->SetInteger(prefs::kUserColor, primary);
++    profile_->GetPrefs()->SetInteger(prefs::kUserColorSecondary, secondary);
++    profile_->GetPrefs()->SetInteger(prefs::kUserColorAccent, accent);
++    profile_->GetPrefs()->SetBoolean(prefs::kIsExactHexTheme, true);
++    profile_->GetPrefs()->SetString(prefs::kCurrentThemeID, kUserColorThemeID);
++  }
++  NotifyThemeChanged();
++}
++
++bool ThemeService::GetIsExactHex() const {
++  return profile_->GetPrefs()->GetBoolean(prefs::kIsExactHexTheme);
++}
++
++std::optional<SkColor> ThemeService::GetUserColorSecondary() const {
++  const SkColor color =
++      profile_->GetPrefs()->GetInteger(prefs::kUserColorSecondary);
++  return color == SK_ColorTRANSPARENT ? std::nullopt
++                                      : std::make_optional(color);
++}
++
++std::optional<SkColor> ThemeService::GetUserColorAccent() const {
++  const SkColor color =
++      profile_->GetPrefs()->GetInteger(prefs::kUserColorAccent);
++  return color == SK_ColorTRANSPARENT ? std::nullopt
++                                      : std::make_optional(color);
++}
++
+ bool ThemeService::GetIsBaseline() const {
+   // Baseline is defined by the absence of a user color set by the corresponding
+   // profile pref or the autogenerated theme.
+@@ -1139,6 +1186,9 @@ void ThemeService::ClearThemePrefs() {
+   profile_->GetPrefs()->ClearPref(prefs::kCurrentThemePackFilename);
+   profile_->GetPrefs()->ClearPref(prefs::kAutogeneratedThemeColor);
+   profile_->GetPrefs()->ClearPref(prefs::kUserColor);
++  profile_->GetPrefs()->ClearPref(prefs::kUserColorSecondary);
++  profile_->GetPrefs()->ClearPref(prefs::kUserColorAccent);
++  profile_->GetPrefs()->ClearPref(prefs::kIsExactHexTheme);
+   profile_->GetPrefs()->ClearPref(prefs::kGrayscaleThemeEnabled);
+   profile_->GetPrefs()->ClearPref(prefs::kBrowserColorVariant);
+   profile_->GetPrefs()->SetString(prefs::kCurrentThemeID,
+diff --git a/chrome/browser/themes/theme_service.h b/chrome/browser/themes/theme_service.h
+index 3f5cfb6a92..b2a622c62a 100644
+--- a/chrome/browser/themes/theme_service.h
++++ b/chrome/browser/themes/theme_service.h
+@@ -244,6 +244,15 @@ class ThemeService : public KeyedService,
+   virtual void SetIsGrayscale(bool is_grayscale);
+   virtual bool GetIsGrayscale() const;
+ 
++  // Sets independent exact primary/secondary/accent colors, bypassing the
++  // normal single-seed Material color derivation (NBrowser custom theming).
++  virtual void SetExactHexColors(SkColor primary,
++                                 SkColor secondary,
++                                 SkColor accent);
++  virtual bool GetIsExactHex() const;
++  virtual std::optional<SkColor> GetUserColorSecondary() const;
++  virtual std::optional<SkColor> GetUserColorAccent() const;
++
+   // Returns true if the current theme is the "baseline" blue theme.
+   virtual bool GetIsBaseline() const;
+ 
+diff --git a/chrome/common/pref_names.h b/chrome/common/pref_names.h
+index 7f2ccebd7e..a31510799b 100644
+--- a/chrome/common/pref_names.h
++++ b/chrome/common/pref_names.h
+@@ -708,6 +708,18 @@ inline constexpr char kDeprecatedUserColorDoNotUse[] =
+     "browser.theme.user_color";
+ inline constexpr char kUserColor[] = "browser.theme.user_color2";
+ 
++// SkColors for the secondary and accent theme roles, used only when
++// `kIsExactHexTheme` is true (NBrowser independent primary/secondary/accent
++// custom theming). SK_ColorTRANSPARENT means unset.
++inline constexpr char kUserColorSecondary[] =
++    "browser.theme.user_color_secondary";
++inline constexpr char kUserColorAccent[] = "browser.theme.user_color_accent";
++
++// Boolean pref tracking whether the theme's primary/secondary/accent colors
++// are each set to an exact user-provided hex color, bypassing the normal
++// single-seed Material color derivation (NBrowser custom theming).
++inline constexpr char kIsExactHexTheme[] = "browser.theme.is_exact_hex";
++
+ // Enum tracking the color variant preference for the browser.
+ // Use `kBrowserColorVariant` only.
+ inline constexpr char kDeprecatedBrowserColorVariantDoNotUse[] =
