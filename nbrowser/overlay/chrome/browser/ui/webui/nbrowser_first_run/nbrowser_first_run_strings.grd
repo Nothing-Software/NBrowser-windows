@@ -101,6 +101,10 @@
          to the English source text at build time, because of
          fallback_to_english="true" below. -->
     <file path="translations/nbrowser_first_run_strings_ru.xtb" lang="ru" />
+    <file path="translations/nbrowser_first_run_strings_es.xtb" lang="es" />
+    <file path="translations/nbrowser_first_run_strings_fr.xtb" lang="fr" />
+    <file path="translations/nbrowser_first_run_strings_zh-CN.xtb" lang="zh-CN" />
+    <file path="translations/nbrowser_first_run_strings_de.xtb" lang="de" />
   </translations>
 
   <release seq="1">

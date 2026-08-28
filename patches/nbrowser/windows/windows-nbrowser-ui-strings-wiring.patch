@@ -1,0 +1,41 @@
+diff --git a/tools/gritsettings/resource_ids.spec b/tools/gritsettings/resource_ids.spec
+index e1f3030f0c..3c43a2a65a 100644
+--- a/tools/gritsettings/resource_ids.spec
++++ b/tools/gritsettings/resource_ids.spec
+@@ -189,6 +189,9 @@
+   "chrome/browser/ui/webui/nbrowser_first_run/nbrowser_first_run_strings.grd": {
+     "messages": [2650],
+   },
++  "chrome/browser/ui/webui/nbrowser_ui_strings/nbrowser_ui_strings.grd": {
++    "messages": [2655],
++  },
+   # END chrome/browser section.
+
+   # START chrome/ WebUI resources section
+diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
+index 973a46b2a3..3db6fa1aa7 100644
+--- a/chrome/BUILD.gn
++++ b/chrome/BUILD.gn
+@@ -1583,6 +1534,7 @@ group("strings") {
+     "//chrome/app:branded_strings",
+     "//chrome/app:generated_resources",
+     "//chrome/app/resources:locale_settings",
++    "//chrome/browser/ui/webui/nbrowser_ui_strings:strings",
+   ]
+ }
+ 
+diff --git a/chrome/chrome_repack_locales.gni b/chrome/chrome_repack_locales.gni
+index 19be5865dc..9d75581dd4 100644
+--- a/chrome/chrome_repack_locales.gni
++++ b/chrome/chrome_repack_locales.gni
+@@ -112,6 +112,10 @@ template("chrome_repack_locales") {
+       source_patterns += [ "${root_gen_dir}/chrome/browser/ui/webui/nbrowser_first_run/nbrowser_first_run_strings_" ]
+       deps += [ "//chrome/browser/ui/webui/nbrowser_first_run:strings" ]
+     }
++    if (!is_android) {
++      source_patterns += [ "${root_gen_dir}/chrome/browser/ui/webui/nbrowser_ui_strings/nbrowser_ui_strings_" ]
++      deps += [ "//chrome/browser/ui/webui/nbrowser_ui_strings:strings" ]
++    }
+     if (enable_builtin_search_provider_assets && !is_android) {
+       source_patterns += [ "${root_gen_dir}/third_party/search_engines_data/search_engine_descriptions_strings_" ]
+       deps += [
