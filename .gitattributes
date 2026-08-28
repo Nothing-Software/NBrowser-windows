@@ -1,0 +1,7 @@
+# Quilt patches must stay byte-exact LF: they're unified diffs applied
+# against build/src, a genuine LF-only Chromium checkout. core.autocrlf=true
+# is set for this repo (Windows-friendly for everything else), which
+# otherwise silently rewrites these to CRLF on every checkout/reset/merge -
+# breaking `git apply --reverse` validation without changing their content
+# in the git object database. Force LF regardless of the autocrlf setting.
+patches/** text eol=lf
