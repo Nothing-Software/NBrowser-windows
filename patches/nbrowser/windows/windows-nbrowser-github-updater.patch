@@ -1,0 +1,394 @@
+# Wires the NBrowser GitHub Releases update checker into the existing
+# startup infobar flow, the InfoBarIdentifier registry, and Local State
+# pref registration. All of the actual feature logic (network check,
+# infobar delegate, installer launcher) lives in new files under
+# nbrowser/overlay/chrome/browser/ui/startup/ - this patch only wires them
+# in with the smallest possible touch to four upstream files, so it stays
+# cheap to rebase across Chromium version bumps.
+
+--- a/components/infobars/core/infobar_delegate.h
++++ b/components/infobars/core/infobar_delegate.h
+@@ -208,6 +208,10 @@
+     JS_OPTIMIZATIONS_INFOBAR_DELEGATE = 133,
+     WEB_APP_BLOCKED_MIGRATION_INFOBAR_DELEGATE = 134,
+     OSCRYPTASYNC_AVAILABILITY_INFOBAR_DELEGATE = 135,
++    // NBrowser-specific identifier - not part of upstream Chromium, so not
++    // wired into the UMA enums.xml LINT.ThenChange this file otherwise
++    // tracks (NBrowser collects no metrics for this to be logged against).
++    NBROWSER_UPDATE_AVAILABLE_INFOBAR_DELEGATE = 136,
+   };
+   // LINT.ThenChange(//tools/metrics/histograms/metadata/browser/enums.xml:InfoBarIdentifier)
+ 
+--- a/chrome/browser/prefs/browser_prefs.cc
++++ b/chrome/browser/prefs/browser_prefs.cc
+@@ -1389,6 +1389,13 @@
+   // below since these aren't owned by a subsystem.
+   registry->RegisterBooleanPref("nbrowser.first_run_language_chosen", false);
+   registry->RegisterBooleanPref("nbrowser.first_run_pending_relaunch", false);
++  // NBrowser GitHub Releases updater - see nbrowser_update_prefs.h. Stores
++  // the release tag the user dismissed the update infobar for, so it isn't
++  // re-shown until a newer release ships.
++  registry->RegisterStringPref("nbrowser.update_ignored_release_tag",
++                               std::string());
++  registry->RegisterBooleanPref("nbrowser.update_available_dot_visible",
++                                false);
+ 
+   // Call outs to individual subsystems that register Local State (browser-wide)
+   // prefs en masse. See RegisterProfilePrefs for per-profile prefs. Please
+--- a/chrome/browser/ui/startup/infobar_utils.cc
++++ b/chrome/browser/ui/startup/infobar_utils.cc
+@@ -58,6 +58,7 @@
+ 
+ #if BUILDFLAG(IS_WIN)
+ #include "chrome/browser/startup/startup_launch_manager.h"  // nogncheck
++#include "chrome/browser/ui/startup/nbrowser_update_prompt.h"
+ #include "chrome/browser/ui/startup/startup_launch_infobar_manager_impl.h"  // nogncheck
+ #endif
+ 
+@@ -212,6 +213,10 @@
+   }
+ #endif
+ 
++#if BUILDFLAG(IS_WIN)
++  chrome::startup::nbrowser_update::MaybeShowUpdatePrompt(web_contents);
++#endif
++
+ #if !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_ANDROID)
+   if (is_web_app ||
+       startup_command_line.HasSwitch(switches::kNoDefaultBrowserCheck) ||
+--- a/chrome/browser/ui/startup/BUILD.gn
++++ b/chrome/browser/ui/startup/BUILD.gn
+@@ -298,10 +298,23 @@
+ 
+     if (is_win) {
+       sources += [
++        "nbrowser_update_checker.cc",
++        "nbrowser_update_infobar_delegate.cc",
++        "nbrowser_update_installer_launcher.cc",
++        "nbrowser_update_prompt.cc",
+         "startup_launch_infobar_delegate.cc",
+         "startup_launch_infobar_manager_impl.cc",
+       ]
+-      deps += [ "//chrome/browser/startup" ]
++      deps += [
++        "//chrome/app/vector_icons",
++        "//chrome/browser/infobars",
++        "//chrome/browser/startup",
++        "//chrome/browser/ui/webui/nbrowser_ui_strings:strings",
++        "//chrome/install_static:install_static_util",
++        "//components/vector_icons",
++        "//services/data_decoder/public/cpp",
++        "//services/network/public/cpp",
++      ]
+     }
+ 
+     if (is_win && is_chrome_branded) {
+--- a/chrome/browser/ui/webui/settings/settings_ui.cc
++++ b/chrome/browser/ui/webui/settings/settings_ui.cc
+@@ -52,6 +52,7 @@
+ #include "chrome/browser/ui/hats/hats_service_factory.h"
+ #include "chrome/browser/ui/managed_ui.h"
+ #include "chrome/browser/ui/passwords/ui_utils.h"
++#include "chrome/browser/ui/startup/nbrowser_update_prefs.h"
+ #include "chrome/browser/ui/toasts/toast_features.h"
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/views/side_panel/customize_chrome/customize_chrome_utils.h"
+@@ -656,6 +657,16 @@
+   html_source->AddBoolean("replaceSyncPromosWithSignInPromos",
+                           syncer::IsReplaceSyncPromosWithSignInPromosEnabled());
+ 
++  // NBrowser GitHub Releases updater - drives the green dot next to "About
++  // NBrowser" in the settings nav menu (settings_menu.ts/.html). Read once
++  // per page load, same as the other booleans on this page; see
++  // nbrowser_update_prefs.h for who writes it.
++  html_source->AddBoolean(
++      "nbrowserUpdateAvailable",
++      g_browser_process->local_state()->GetBoolean(
++          chrome::startup::nbrowser_update::prefs::
++              kUpdateAvailableDotVisible));
++
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING) && !BUILDFLAG(IS_CHROMEOS)
+   // On Device AI setting.
+   // TODO(crbug.com/466442880): Grey out toggle based on device capability and
+--- a/chrome/browser/resources/settings/settings_menu/settings_menu.html
++++ b/chrome/browser/resources/settings/settings_menu/settings_menu.html
+@@ -30,6 +30,17 @@
+         margin-top: 8px;
+       }
+ 
++      /* NBrowser GitHub Releases updater: dot next to "About NBrowser"
++         indicating a newer version was found. */
++      .nbrowser-update-dot {
++        background-color: var(--google-green-600);
++        border-radius: 50%;
++        display: inline-block;
++        height: 8px;
++        margin-inline-start: 6px;
++        width: 8px;
++      }
++
+       @media (prefers-color-scheme: dark) {
+         #menu {
+           color: var(--cr-primary-text-color);
+@@ -38,6 +49,10 @@
+         .menu-separator {
+           border-bottom: var(--cr-separator-line);  /* override */
+         }
++
++        .nbrowser-update-dot {
++          background-color: var(--google-green-300);
++        }
+       }
+     </style>
+ 
+@@ -169,6 +184,8 @@
+             class="cr-nav-menu-item">
+           <cr-icon icon="cr:chrome-product"></cr-icon>
+           $i18n{aboutPageTitle}
++          <span class="nbrowser-update-dot"
++              hidden="[[!updateAvailable_]]"></span>
+           <cr-ripple></cr-ripple>
+         </a>
+       </cr-menu-selector>
+--- a/chrome/browser/resources/settings/settings_menu/settings_menu.ts
++++ b/chrome/browser/resources/settings/settings_menu/settings_menu.ts
+@@ -76,12 +76,20 @@
+           return loadTimeData.getBoolean('enableYourSavedInfoSettingsPage');
+         },
+       },
++
++      // NBrowser GitHub Releases updater - see settings_ui.cc for who sets
++      // the underlying "nbrowserUpdateAvailable" loadTimeData boolean.
++      updateAvailable_: {
++        type: Boolean,
++        value: () => loadTimeData.getBoolean('nbrowserUpdateAvailable'),
++      },
+     };
+   }
+ 
+   declare private pageVisibility_?: PageVisibility;
+   declare private showAiPage_: boolean;
+   declare private enableYourSavedInfoSettingsPage_: boolean;
++  declare private updateAvailable_: boolean;
+   private metricsBrowserProxy_: MetricsBrowserProxy =
+       MetricsBrowserProxyImpl.getInstance();
+ 
+--- a/chrome/browser/ui/webui/help/BUILD.gn
++++ b/chrome/browser/ui/webui/help/BUILD.gn
+@@ -49,21 +49,19 @@
+   }
+ 
+   if (is_win) {
+-    if (is_chrome_branded) {
+-      sources = [ "version_updater_win.cc" ]
+-      deps += [
+-        "//chrome/app:generated_resources_grit",
+-        "//chrome/browser:browser_process",
+-        "//chrome/browser/first_run",
+-        "//chrome/browser/google",
+-        "//content/public/browser",
+-        "//ui/aura",
+-        "//ui/base",
+-        "//ui/gfx",
+-      ]
+-    } else {
+-      sources = [ "version_updater_basic.cc" ]
+-    }
++    # NBrowser: version_updater_win.cc is fully replaced by our own overlay
++    # (see nbrowser/overlay/chrome/browser/ui/webui/help/), which talks to
++    # our GitHub Releases checker instead of Google Update's COM interfaces
++    # - so unlike upstream, it no longer needs is_chrome_branded (NBrowser
++    # never sets that flag) and doesn't need aura/gfx/first_run/google.
++    sources = [ "version_updater_win.cc" ]
++    deps += [
++      "//chrome/browser/ui/startup:impl",
++      "//chrome/browser/ui/webui/nbrowser_ui_strings:strings",
++      "//components/version_info",
++      "//content/public/browser",
++      "//ui/base",
++    ]
+   }
+ 
+   if (is_linux) {
+--- a/chrome/browser/ui/webui/settings/about_handler.h
++++ b/chrome/browser/ui/webui/settings/about_handler.h
+@@ -145,6 +145,19 @@
+   // Checks for and applies update.
+   void RequestUpdate();
+ 
++#if BUILDFLAG(IS_WIN)
++  // ===== NBROWSER_TEST_ONLY - START =====
++  // Temporary "Test" button handler for chrome://settings/help, so the
++  // GitHub Releases updater's UI (this page's status block, the startup
++  // infobar, and the nav menu's update dot) can be previewed without a
++  // real GitHub release to test against. Delete this method, its
++  // RegisterMessages() registration in about_handler.cc, and the matching
++  // "Test" button in about_page.ts/.html.ts/about_page_browser_proxy.ts
++  // once real-release testing is possible.
++  void HandleNBrowserTestUpdate(const base::ListValue& args);
++  // ===== NBROWSER_TEST_ONLY - END =====
++#endif  // BUILDFLAG(IS_WIN)
++
+   // Callback method which forwards status updates to the page.
+   void SetUpdateStatus(VersionUpdater::Status status,
+                        int progress,
+--- a/chrome/browser/ui/webui/settings/about_handler.cc
++++ b/chrome/browser/ui/webui/settings/about_handler.cc
+@@ -50,6 +50,12 @@
+ #include "ui/base/l10n/l10n_util.h"
+ #include "v8/include/v8-version-string.h"
+ 
++#if BUILDFLAG(IS_WIN)
++// NBROWSER_TEST_ONLY - see the matching handler declaration/definition.
++#include "chrome/browser/ui/startup/nbrowser_update_checker.h"
++#include "chrome/browser/ui/startup/nbrowser_update_prompt.h"
++#endif  // BUILDFLAG(IS_WIN)
++
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include <optional>
+ 
+@@ -314,6 +320,13 @@
+   web_ui()->RegisterMessageCallback(
+       "openHelpPage", base::BindRepeating(&AboutHandler::HandleOpenHelpPage,
+                                           base::Unretained(this)));
++#if BUILDFLAG(IS_WIN)
++  // NBROWSER_TEST_ONLY - see the matching handler declaration/definition.
++  web_ui()->RegisterMessageCallback(
++      "nbrowserTestUpdate",
++      base::BindRepeating(&AboutHandler::HandleNBrowserTestUpdate,
++                          base::Unretained(this)));
++#endif  // BUILDFLAG(IS_WIN)
+ #if BUILDFLAG(IS_CHROMEOS)
+   web_ui()->RegisterMessageCallback(
+       "openDiagnostics",
+@@ -981,4 +994,19 @@
+ }
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+ 
++#if BUILDFLAG(IS_WIN)
++// ===== NBROWSER_TEST_ONLY - START =====
++// See the declaration in about_handler.h for what to delete alongside this.
++void AboutHandler::HandleNBrowserTestUpdate(const base::ListValue& args) {
++  chrome::startup::nbrowser_update::SetMockUpdateForTesting(true);
++  // Refresh this page's own status block using the mock.
++  RequestUpdate();
++  // Show the startup-style infobar too, on this page's own tab, so its
++  // design can be previewed without waiting for the next browser launch.
++  chrome::startup::nbrowser_update::MaybeShowUpdatePrompt(
++      web_ui()->GetWebContents());
++}
++// ===== NBROWSER_TEST_ONLY - END =====
++#endif  // BUILDFLAG(IS_WIN)
++
+ }  // namespace settings
+--- a/chrome/browser/resources/settings/about_page/about_page.html.ts
++++ b/chrome/browser/resources/settings/about_page/about_page.html.ts
+@@ -23,7 +23,13 @@
+   <div class="cr-row two-line">
+     <!-- Set the icon from the iconset (when it's obsolete/EOL and
+       when update is done) or set the src (when it's updating). -->
+-<if expr="False">
++<!-- NBrowser: upstream ships this block behind expr="False" (permanently
++     disabled at grit-preprocessing time) as of this Chromium version -
++     re-enabled here with the same "not is_chromeos" gate the sibling
++     Relaunch button below already uses, since NBrowser's GitHub Releases
++     updater (chrome/browser/ui/webui/help/version_updater_win.cc) needs
++     this block to actually display anything. -->
++<if expr="not is_chromeos">
+     <div class="icon-container"
+         ?hidden="${!this.shouldShowIcons_()}">
+       <cr-icon
+@@ -35,7 +41,8 @@
+     </div>
+ </if>
+     <div class="flex cr-padded-text">
+-<if expr="False">
++<!-- NBrowser: see the matching comment above the icon-container block. -->
++<if expr="not is_chromeos">
+       <div id="updateStatusMessage" ?hidden="${!this.showUpdateStatus_}">
+         <div role="alert" aria-live="polite"
+             .innerHTML="${this.getUpdateStatusMessage_()}">
+@@ -65,6 +72,22 @@
+         $i18n{aboutRelaunch}
+       </cr-button>
+     </span>
++<if expr="is_win">
++    <!-- ===== NBROWSER_TEST_ONLY - START =====
++         Always-visible (not gated by showButtonContainer_ - this needs to
++         be clickable regardless of update status) temporary button that
++         exercises the GitHub Releases updater end to end with mock data:
++         this page's own status block above, the startup-style infobar,
++         and (on next full page load) the nav menu's update dot. Remove
++         together with HandleNBrowserTestUpdate in about_handler.h/.cc and
++         testUpdate() in about_page_browser_proxy.ts once a real GitHub
++         release exists to test against instead. -->
++    <cr-button id="nbrowserTestUpdate"
++        @click="${this.onNBrowserTestUpdateClick_}">
++      Test
++    </cr-button>
++    <!-- ===== NBROWSER_TEST_ONLY - END ===== -->
++</if>
+ </if>
+   </div>
+ <if expr="_google_chrome and is_macosx">
+--- a/chrome/browser/resources/settings/about_page/about_page.ts
++++ b/chrome/browser/resources/settings/about_page/about_page.ts
+@@ -51,7 +51,8 @@
+ export interface SettingsAboutPageElement {
+   $: {
+     productLogo: HTMLImageElement,
+-    // <if expr="False">
++    // NBrowser: re-enabled, see the matching comment in about_page.html.ts.
++    // <if expr="not is_chromeos">
+     deprecationWarning: HTMLElement,
+     updateStatusMessage: HTMLElement,
+     // </if>
+@@ -229,6 +230,14 @@
+     this.performRestart(RestartType.RELAUNCH);
+   }
+ 
++  // NBROWSER_TEST_ONLY - remove together with the matching button in
++  // about_page.html.ts, testUpdate() in about_page_browser_proxy.ts, and
++  // HandleNBrowserTestUpdate in about_handler.h/.cc once a real GitHub
++  // release exists to test the updater against instead.
++  protected onNBrowserTestUpdateClick_() {
++    this.aboutBrowserProxy_.testUpdate();
++  }
++
+   // <if expr="not is_chromeos">
+   private updateShowUpdateStatus_() {
+     if (this.obsoleteSystemInfo_.endOfLine) {
+--- a/chrome/browser/resources/settings/about_page/about_page_browser_proxy.ts
++++ b/chrome/browser/resources/settings/about_page/about_page_browser_proxy.ts
+@@ -73,6 +73,17 @@
+    */
+   promoteUpdater(): void;
+   // </if>
++
++  // <if expr="is_win">
++  /**
++   * NBROWSER_TEST_ONLY - triggers a mock update check exercising the
++   * GitHub Releases updater end to end (status block, startup-style
++   * infobar, nav menu dot) without a real GitHub release to test against.
++   * Remove together with the "Test" button in about_page.html.ts/.ts and
++   * HandleNBrowserTestUpdate in about_handler.h/.cc.
++   */
++  testUpdate(): void;
++  // </if>
+ }
+ 
+ export class AboutPageBrowserProxyImpl implements AboutPageBrowserProxy {
+@@ -94,6 +105,13 @@
+     chrome.send('openHelpPage');
+   }
+ 
++  // <if expr="is_win">
++  // NBROWSER_TEST_ONLY - see the interface doc comment above.
++  testUpdate() {
++    chrome.send('nbrowserTestUpdate');
++  }
++  // </if>
++
+   // <if expr="_google_chrome">
+   openFeedbackDialog() {
+     chrome.send('openFeedbackDialog');
