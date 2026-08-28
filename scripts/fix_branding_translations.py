@@ -22,15 +22,22 @@ re-branded) existing translation becomes invisible, and grit silently
 falls back to displaying the English text for every locale.
 
 What this script does instead: for every <message> in every swept .grd/
-.grdp file, it computes the message's real grit translation fingerprint
-both BEFORE and AFTER the substitution (using the exact same algorithm
-grit itself uses). Whenever that fingerprint changes, every locale's
+.grdp file, it computes the message's real grit translation fingerprint for
+the PRISTINE upstream text (read via `git show HEAD:<path>` - build/src is
+a real Chromium git checkout that this project never commits its own
+changes into, so HEAD always has the genuine un-rebranded source,
+regardless of how many times branding has already been applied to the
+on-disk working tree) and for that same text after the substitution.
+Whenever those two fingerprints differ, every locale's
 <translation id="OLD"> declared in that .grd's own <translations> section
 is renamed to id="NEW"> - so the existing, already-correctly-substituted
 translation stays linked to its message instead of being silently
-orphaned. This is fully automatic and re-derived from the current source
-tree on every run, so it keeps working across upstream rebases without
-any hand-maintained list of string ids.
+orphaned. Anchoring to git HEAD rather than "whatever the file said before
+this specific run" makes this retroactive: it fixes files branding already
+ran on in the past just as well as files seeing it for the first time.
+Fully automatic and re-derived from the current source tree on every run,
+so it keeps working across upstream rebases without any hand-maintained
+list of string ids.
 
 Limitation: messages containing <ph> placeholders are substituted the same
 as before (their *text* still gets branded) but are NOT fingerprint-remapped
@@ -41,7 +48,12 @@ strings that actually carry the brand name in a *placeholder-visible* way
 ("Reset to Default $BRAND", "Customize $BRAND", ...) are plain text, so
 this covers what matters; placeholder-bearing messages just keep falling
 back to English exactly as they did before this script existed (not a
-regression - simply not (yet) fixed).
+regression - simply not (yet) fixed). Likewise, a .grd file with no git
+history at all (a brand-new file a patch adds, e.g.
+nbrowser_first_run_strings.grd) has no pristine baseline to anchor to, so
+it just gets the plain text substitution with no remap attempt - correct,
+since a file that never shipped upstream never had orphanable translations
+to begin with.
 
 Usage:
     python fix_branding_translations.py <build/src root>
@@ -52,6 +64,7 @@ Called from apply_branding_assets.ps1 in place of a blind PowerShell sweep.
 import hashlib
 import os
 import re
+import subprocess
 import sys
 import xml.sax.saxutils as saxutils
 
@@ -59,7 +72,6 @@ BRAND_NAME = "NBrowser"
 COMPANY_NAME = "Nothing Software"
 
 STRING_ROOTS = ["chrome", "components", "extensions", "ui", "content"]
-STRING_SUFFIXES = (".grd", ".grdp", ".xtb")
 
 # Applied in this exact order, case-sensitively - mirrors
 # apply_branding_assets.ps1's -creplace chain 1:1.
@@ -123,22 +135,61 @@ def presentable_text(raw_body):
     return saxutils.unescape(raw_body).strip()
 
 
-def compute_remaps_for_grd(content):
-    """Returns a list of (old_id, new_id) for every plain-text <message> in
-    `content` whose fingerprint changes once the brand substitution is
-    applied to its body. Messages containing <ph> are skipped."""
-    remaps = []
+def extract_messages(content):
+    """Returns {name: (old_text, meaning)} for every plain-text (no <ph>)
+    message in `content` whose body actually needs the brand substitution."""
+    messages = {}
     for m in MESSAGE_RE.finditer(content):
         body = m.group("body")
         if "<ph" in body:
             continue
-        old_text = presentable_text(body)
-        if not old_text or not needs_substitution(old_text):
+        text = presentable_text(body)
+        if not text or not needs_substitution(text):
             continue
         meaning_match = MEANING_RE.search(m.group("attrs"))
         meaning = meaning_match.group(1) if meaning_match else ""
         if meaning and needs_substitution(meaning):
             meaning = substitute(meaning)
+        messages[m.group("name")] = (text, meaning)
+    return messages
+
+
+def git_show_head(repo_root, rel_path):
+    """Returns the git-HEAD (pristine, pre-branding) content of a tracked
+    file, or None if it isn't tracked (a new file a patch adds) or git
+    fails for any other reason."""
+    try:
+        result = subprocess.run(
+            ["git", "show", f"HEAD:{rel_path.replace(os.sep, '/')}"],
+            cwd=repo_root,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    try:
+        return result.stdout.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def compute_remaps_for_grd(repo_root, grd_path, current_content):
+    """Returns a list of (old_id, new_id) for every plain-text <message>
+    whose fingerprint differs between the pristine git-HEAD text and that
+    same text after the brand substitution. Anchoring to HEAD (rather than
+    diffing this run's before/after) makes this correct even when branding
+    already ran on this file in an earlier pass."""
+    rel_path = os.path.relpath(grd_path, repo_root)
+    pristine_content = git_show_head(repo_root, rel_path)
+    if pristine_content is None:
+        return []
+    pristine_messages = extract_messages(pristine_content)
+    if not pristine_messages:
+        return []
+    remaps = []
+    for name, (old_text, meaning) in pristine_messages.items():
         new_text = substitute(old_text)
         if new_text == old_text:
             continue
@@ -149,14 +200,14 @@ def compute_remaps_for_grd(content):
     return remaps
 
 
-def collect_locale_files(grd_path, content):
+def collect_locale_files(repo_root, grd_path, current_content):
     """Returns {absolute_xtb_path: [(old_id, new_id), ...]} declared by this
-    .grd's own <translations> section, paired with the remaps computed from
-    its own messages."""
-    block_match = TRANSLATIONS_BLOCK_RE.search(content)
+    .grd's own <translations> section, paired with the remaps computed
+    against its pristine git-HEAD messages."""
+    block_match = TRANSLATIONS_BLOCK_RE.search(current_content)
     if not block_match:
         return {}
-    remaps = compute_remaps_for_grd(content)
+    remaps = compute_remaps_for_grd(repo_root, grd_path, current_content)
     if not remaps:
         return {}
     grd_dir = os.path.dirname(grd_path)
@@ -171,9 +222,8 @@ def collect_locale_files(grd_path, content):
 def read_text(path):
     with open(path, "rb") as f:
         raw = f.read()
-    # These files are UTF-8 with mixed LF/CRLF; decode losslessly and let
-    # Python's universal-newline-unaware manual handling preserve \r\n as-is
-    # by simply not touching line endings anywhere in this script.
+    # These files are UTF-8 with mixed LF/CRLF; decode losslessly and leave
+    # line endings untouched everywhere in this script.
     return raw.decode("utf-8")
 
 
@@ -197,13 +247,13 @@ def main():
     if len(sys.argv) != 2:
         print("usage: fix_branding_translations.py <build/src root>", file=sys.stderr)
         return 1
-    root = sys.argv[1]
+    root = os.path.abspath(sys.argv[1])
 
     xtb_remaps = {}  # absolute xtb path -> [(old_id, new_id), ...]
     swept_files = 0
 
-    # Pass 1: .grd/.grdp files. Substitute + collect id remaps for their
-    # declared locale .xtb files.
+    # Pass 1: .grd/.grdp files. Substitute + collect id remaps (anchored to
+    # git HEAD) for their declared locale .xtb files.
     for root_name in STRING_ROOTS:
         root_path = os.path.join(root, root_name)
         if not os.path.isdir(root_path):
@@ -214,9 +264,12 @@ def main():
                     continue
                 path = os.path.join(dirpath, filename)
                 content = read_text(path)
-                if not needs_substitution(content):
+                # Consider files that either still need branding, or already
+                # carry it (a prior run may have already substituted this
+                # exact file, and we still want to compute remaps for it).
+                if not (needs_substitution(content) or BRAND_NAME in content):
                     continue
-                for xtb_path, remaps in collect_locale_files(path, content).items():
+                for xtb_path, remaps in collect_locale_files(root, path, content).items():
                     xtb_remaps.setdefault(xtb_path, []).extend(remaps)
                 new_content = substitute(content)
                 if new_content != content:
