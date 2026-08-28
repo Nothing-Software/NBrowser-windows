@@ -93,6 +93,7 @@ TRANSLATIONS_BLOCK_RE = re.compile(
 XTB_FILE_RE = re.compile(
     r'<file\s+path="([^"]+\.xtb)"\s+lang="([^"]+)"\s*/>'
 )
+PART_FILE_RE = re.compile(r'<part\s+file="([^"]+\.grdp)"')
 
 
 def substitute(text):
@@ -200,23 +201,88 @@ def compute_remaps_for_grd(repo_root, grd_path, current_content):
     return remaps
 
 
-def collect_locale_files(repo_root, grd_path, current_content):
-    """Returns {absolute_xtb_path: [(old_id, new_id), ...]} declared by this
-    .grd's own <translations> section, paired with the remaps computed
-    against its pristine git-HEAD messages."""
+def own_translations_xtb_paths(grd_path, current_content):
+    """Returns the absolute .xtb paths declared by this file's own
+    <translations> section (present on top-level .grd files; .grdp part
+    files never have one of their own)."""
     block_match = TRANSLATIONS_BLOCK_RE.search(current_content)
     if not block_match:
+        return []
+    grd_dir = os.path.dirname(grd_path)
+    return [
+        os.path.normpath(os.path.join(grd_dir, file_match.group(1)))
+        for file_match in XTB_FILE_RE.finditer(block_match.group(1))
+    ]
+
+
+def collect_locale_files(repo_root, grd_path, current_content, grdp_xtb_paths):
+    """Returns {absolute_xtb_path: [(old_id, new_id), ...]}, pairing this
+    file's messages' remaps (computed against pristine git-HEAD text) with
+    every locale .xtb that can actually see them: this file's own
+    <translations> section for a top-level .grd, or - for a .grdp part file,
+    which never has a <translations> section of its own - every .xtb
+    reachable from whichever .grd file(s) <part file="..."> it in
+    (grdp_xtb_paths, precomputed by build_grdp_xtb_index)."""
+    xtb_paths = own_translations_xtb_paths(grd_path, current_content)
+    if not xtb_paths:
+        xtb_paths = sorted(grdp_xtb_paths.get(os.path.normpath(grd_path), set()))
+    if not xtb_paths:
         return {}
     remaps = compute_remaps_for_grd(repo_root, grd_path, current_content)
     if not remaps:
         return {}
-    grd_dir = os.path.dirname(grd_path)
     result = {}
-    for file_match in XTB_FILE_RE.finditer(block_match.group(1)):
-        rel_path = file_match.group(1)
-        xtb_path = os.path.normpath(os.path.join(grd_dir, rel_path))
+    for xtb_path in xtb_paths:
         result.setdefault(xtb_path, []).extend(remaps)
     return result
+
+
+def iter_grd_grdp_files(root):
+    for root_name in STRING_ROOTS:
+        root_path = os.path.join(root, root_name)
+        if not os.path.isdir(root_path):
+            continue
+        for dirpath, _dirnames, filenames in os.walk(root_path):
+            for filename in filenames:
+                if filename.endswith((".grd", ".grdp")):
+                    yield os.path.join(dirpath, filename)
+
+
+def build_grdp_xtb_index(root):
+    """Returns {absolute_grdp_path: set(absolute_xtb_path)}, mapping every
+    .grdp part file to the locale .xtb files declared by every top-level
+    .grd that <part file="..."> includes it (directly or transitively
+    through another .grdp), so remaps computed for messages living in a
+    .grdp can still be applied to the locale files that actually matter -
+    those are declared several directory levels up, on the .grd doing the
+    including, not on the part file itself."""
+    # child_path -> set of parent .grd/.grdp absolute paths that include it.
+    parents = {}
+    grd_own_xtbs = {}  # absolute .grd path -> set of absolute xtb paths
+    for path in iter_grd_grdp_files(root):
+        content = read_text(path)
+        xtbs = own_translations_xtb_paths(path, content)
+        if xtbs:
+            grd_own_xtbs[path] = set(xtbs)
+        base_dir = os.path.dirname(path)
+        for part_match in PART_FILE_RE.finditer(content):
+            child_path = os.path.normpath(os.path.join(base_dir, part_match.group(1)))
+            parents.setdefault(child_path, set()).add(path)
+
+    index = {}
+
+    def resolve(path, seen):
+        if path in seen:
+            return set()
+        seen.add(path)
+        xtbs = set(grd_own_xtbs.get(path, ()))
+        for parent in parents.get(path, ()):
+            xtbs |= resolve(parent, seen)
+        return xtbs
+
+    for grdp_path in parents:
+        index[grdp_path] = resolve(grdp_path, set())
+    return index
 
 
 def read_text(path):
@@ -252,29 +318,26 @@ def main():
     xtb_remaps = {}  # absolute xtb path -> [(old_id, new_id), ...]
     swept_files = 0
 
+    # Pass 0: map every .grdp part file to the locale .xtb files declared by
+    # whichever top-level .grd(s) actually <part file="..."> include it -
+    # a .grdp never has a <translations> section of its own.
+    grdp_xtb_index = build_grdp_xtb_index(root)
+
     # Pass 1: .grd/.grdp files. Substitute + collect id remaps (anchored to
     # git HEAD) for their declared locale .xtb files.
-    for root_name in STRING_ROOTS:
-        root_path = os.path.join(root, root_name)
-        if not os.path.isdir(root_path):
+    for path in iter_grd_grdp_files(root):
+        content = read_text(path)
+        # Consider files that either still need branding, or already
+        # carry it (a prior run may have already substituted this
+        # exact file, and we still want to compute remaps for it).
+        if not (needs_substitution(content) or BRAND_NAME in content):
             continue
-        for dirpath, _dirnames, filenames in os.walk(root_path):
-            for filename in filenames:
-                if not filename.endswith((".grd", ".grdp")):
-                    continue
-                path = os.path.join(dirpath, filename)
-                content = read_text(path)
-                # Consider files that either still need branding, or already
-                # carry it (a prior run may have already substituted this
-                # exact file, and we still want to compute remaps for it).
-                if not (needs_substitution(content) or BRAND_NAME in content):
-                    continue
-                for xtb_path, remaps in collect_locale_files(root, path, content).items():
-                    xtb_remaps.setdefault(xtb_path, []).extend(remaps)
-                new_content = substitute(content)
-                if new_content != content:
-                    write_text(path, new_content)
-                    swept_files += 1
+        for xtb_path, remaps in collect_locale_files(root, path, content, grdp_xtb_index).items():
+            xtb_remaps.setdefault(xtb_path, []).extend(remaps)
+        new_content = substitute(content)
+        if new_content != content:
+            write_text(path, new_content)
+            swept_files += 1
 
     # Pass 2: every .xtb file (same scope apply_branding_assets.ps1 always
     # swept). Substitute their text, then apply any id remaps collected
