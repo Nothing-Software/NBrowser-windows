@@ -4,7 +4,7 @@ index 372515124a..c6a9b9c95b 100644
 +++ b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.cc
 @@ -34,2 +34,3 @@
  #include "chrome/grit/generated_resources.h"
-+#include "chrome/grit/nbrowser_ui_strings.h"
++#include "chrome/browser/ui/webui/nbrowser_ui_strings/grit/nbrowser_ui_strings.h"
  #include "chrome/grit/side_panel_customize_chrome_resources.h"
 @@ -120,6 +120,15 @@ CustomizeChromeUI::CustomizeChromeUI(content::WebUI* web_ui)
        {"greyDefaultColorName", IDS_NTP_CUSTOMIZE_GREY_DEFAULT_LABEL},
@@ -28,7 +28,7 @@ index 320b87722b..4408bf7208 100644
 +++ b/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.cc
 @@ -86,2 +86,3 @@
  #include "chrome/grit/generated_resources.h"
-+#include "chrome/grit/nbrowser_ui_strings.h"
++#include "chrome/browser/ui/webui/nbrowser_ui_strings/grit/nbrowser_ui_strings.h"
  #include "chrome/grit/new_tab_page_resources.h"
 @@ -396,6 +396,14 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(
        {"colorPickerLabel", IDS_NTP_CUSTOMIZE_COLOR_PICKER_LABEL},
@@ -51,7 +51,7 @@ index d21c249464..8e24ff4703 100644
 +++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
 @@ -68,2 +68,3 @@
  #include "chrome/grit/generated_resources.h"
-+#include "chrome/grit/nbrowser_ui_strings.h"
++#include "chrome/browser/ui/webui/nbrowser_ui_strings/grit/nbrowser_ui_strings.h"
  #include "components/autofill/content/browser/content_autofill_client.h"
 @@ -2278,6 +2278,14 @@ void AddPeopleStrings(content::WebUIDataSource* html_source, Profile* profile) {
        {"greyDefaultColorName", IDS_NTP_CUSTOMIZE_GREY_DEFAULT_LABEL},
@@ -74,7 +74,7 @@ index 37f3de8ad7..7204112afe 100644
 +++ b/chrome/browser/ui/webui/signin/profile_customization_ui.cc
 @@ -23,2 +23,3 @@
  #include "chrome/grit/generated_resources.h"
-+#include "chrome/grit/nbrowser_ui_strings.h"
++#include "chrome/browser/ui/webui/nbrowser_ui_strings/grit/nbrowser_ui_strings.h"
  #include "chrome/grit/signin_resources.h"
 @@ -97,6 +97,14 @@ ProfileCustomizationUI::ProfileCustomizationUI(content::WebUI* web_ui)
        {"defaultColorName", IDS_NTP_CUSTOMIZE_DEFAULT_LABEL},
@@ -97,7 +97,7 @@ index dbee43b523..72e0c11e01 100644
 +++ b/chrome/browser/ui/webui/feature_showcase/feature_showcase_ui.cc
 @@ -30,2 +30,3 @@
  #include "chrome/grit/intro_resources.h"
-+#include "chrome/grit/nbrowser_ui_strings.h"
++#include "chrome/browser/ui/webui/nbrowser_ui_strings/grit/nbrowser_ui_strings.h"
  #include "chrome/grit/theme_resources.h"
 @@ -102,6 +102,14 @@ void AddThemesAndCustomizationStepResources(content::WebUIDataSource* source) {
        {"defaultColorName", IDS_NTP_CUSTOMIZE_DEFAULT_LABEL},
