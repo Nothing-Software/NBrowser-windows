@@ -1,0 +1,12 @@
+<?xml version="1.0" ?>
+<!DOCTYPE translationbundle>
+<translationbundle lang="zh-CN">
+<translation id="259939095371044506">辅助色</translation>
+<translation id="1684279041537802716">强调色</translation>
+<translation id="2707021329343209294">已保存的颜色</translation>
+<translation id="3460332313611173557">请输入有效的十六进制颜色代码，例如 #000000</translation>
+<translation id="4277430129575371624">主色</translation>
+<translation id="5558616452704772882">自定义颜色</translation>
+<translation id="7233421021020136469">删除已保存的颜色</translation>
+<translation id="8835511040431265190">保存预设</translation>
+</translationbundle>

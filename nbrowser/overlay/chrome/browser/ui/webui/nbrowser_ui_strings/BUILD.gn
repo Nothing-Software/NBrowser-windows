@@ -1,0 +1,19 @@
+# Copyright 2026 The NBrowser Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//tools/grit/grit_rule.gni")
+
+grit_strings("strings") {
+  source = "nbrowser_ui_strings.grd"
+  outputs = [ "grit/nbrowser_ui_strings.h" ]
+
+  # grit_strings() defaults output_prefix to "${target_name}_", i.e.
+  # "strings_" for this target - but the .grd's own <outputs> block (and the
+  # source_patterns entry in chrome_repack_locales.gni) both use the full
+  # "nbrowser_ui_strings_" prefix, matching every other grit_strings target
+  # in the tree (e.g. indigo_strings, which sidesteps this by naming its
+  # target "indigo_strings" instead of "strings"). Override explicitly
+  # instead of renaming the target, to keep the GN label ":strings" stable.
+  output_prefix = "nbrowser_ui_strings_"
+}

@@ -51,6 +51,7 @@ TARGET_LOCALES = ["ru", "es", "fr", "zh-CN", "de"]
 # Add new entries here as new NBrowser-only UI ships its own string bundle.
 NBROWSER_GRD_FILES = [
     "nbrowser/overlay/chrome/browser/ui/webui/nbrowser_first_run/nbrowser_first_run_strings.grd",
+    "nbrowser/overlay/chrome/browser/ui/webui/nbrowser_ui_strings/nbrowser_ui_strings.grd",
 ]
 
 OUTPUT_LANG_RE = re.compile(
