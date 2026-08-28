@@ -32,3 +32,9 @@ nbrowser/windows/windows-nbrowser-restore-google-search.patch
 nbrowser/windows/windows-nbrowser-first-run-prefs-deps.patch
 nbrowser/windows/windows-nbrowser-first-run-language-prefs.patch
 nbrowser/windows/windows-nbrowser-default-settings.patch
+nbrowser/windows/windows-nbrowser-theme-color-provider-key.patch
+nbrowser/windows/windows-nbrowser-theme-exact-color-engine.patch
+nbrowser/windows/windows-nbrowser-theme-service-exact-hex.patch
+nbrowser/windows/windows-nbrowser-theme-mojom-handler.patch
+nbrowser/windows/windows-nbrowser-theme-picker-ui.patch
+nbrowser/windows/windows-nbrowser-theme-picker-l10n.patch
