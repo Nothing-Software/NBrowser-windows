@@ -12,10 +12,8 @@
 
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/location.h"
 #include "base/notreached.h"
 #include "base/strings/strcat.h"
-#include "base/task/sequenced_task_runner.h"
 #include "base/values.h"
 #include "base/version.h"
 #include "base/win/windows_version.h"
@@ -83,9 +81,6 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
 // actually runs - not what this binary happens to be built for. See
 // OSInfo::GetArchitecture()'s own documentation for why that distinction
 // matters on ARM64 hosts.
-// TEMPORARY TEST-ONLY - see SetMockUpdateForTesting()'s doc comment.
-bool g_mock_update_for_testing = false;
-
 std::string_view GetTargetCpuSuffix() {
   switch (base::win::OSInfo::GetArchitecture()) {
     case base::win::OSInfo::X86_ARCHITECTURE:
@@ -219,27 +214,9 @@ void OnReleaseFetched(base::Version current_version,
 
 void CheckForUpdate(const base::Version& current_version,
                     CheckForUpdateCallback callback) {
-  if (g_mock_update_for_testing) {
-    // TEMPORARY TEST-ONLY - see SetMockUpdateForTesting()'s doc comment.
-    // Posted rather than run inline so this behaves identically to the
-    // real, always-asynchronous network path for every caller.
-    AvailableUpdate mock_update;
-    mock_update.tag_name = "999.0.0.1-1.1";
-    mock_update.installer_download_url =
-        GURL("https://example.invalid/nbrowser_test_installer.exe");
-    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE,
-        base::BindOnce(std::move(callback), std::move(mock_update)));
-    return;
-  }
-
   FetchUrl(GURL(kLatestReleaseUrl),
           base::BindOnce(&OnReleaseFetched, current_version,
                           std::move(callback)));
-}
-
-void SetMockUpdateForTesting(bool available) {
-  g_mock_update_for_testing = available;
 }
 
 }  // namespace chrome::startup::nbrowser_update
