@@ -56,43 +56,20 @@ if (Test-Path $brandingFile) {
     Write-Output "BRANDING file not found at $brandingFile - skipping."
 }
  
-# --- 3. Sweep all .grd/.grdp/.xtb strings for "Chromium" ---
-$stringRoots = @("chrome", "components", "extensions", "ui", "content")
-$stringSuffixes = @(".grd", ".grdp", ".xtb")
-$replacedCount = 0
- 
-foreach ($rootName in $stringRoots) {
-    $rootPath = Join-Path $dst $rootName
-    if (-not (Test-Path $rootPath)) { continue }
- 
-    $targetFiles = Get-ChildItem -Path $rootPath -Recurse -File | Where-Object {
-        $stringSuffixes -contains $_.Extension
-    }
- 
-    foreach ($file in $targetFiles) {
-        $text = $null
-        try {
-            $text = [System.IO.File]::ReadAllText($file.FullName, [System.Text.Encoding]::UTF8)
-        } catch {
-            continue
-        }
-        if ($text -notmatch "Chromium" -and $text -notmatch "ungoogled-chromium") {
-            continue
-        }
- 
-        $newText = $text
-        # Order matters: most specific first (case-sensitive, like the
-        # original Python: 'Chromium' and 'chromium' never collide).
-        $newText = $newText -creplace "The Chromium Authors", $CompanyName
-        $newText = $newText -creplace "Chromium", $BrandName
-        $newText = $newText -creplace "ungoogled-chromium", "$BrandName by $CompanyName"
- 
-        if ($newText -ne $text) {
-            [System.IO.File]::WriteAllText($file.FullName, $newText, [System.Text.UTF8Encoding]::new($false))
-            $replacedCount++
-        }
-    }
+# --- 3. Sweep all .grd/.grdp/.xtb strings for "Chromium", keeping .xtb
+#        translations linked to their message (see fix_branding_translations.py
+#        for why this can't be a blind text substitution). ---
+$fixScript = Join-Path $PSScriptRoot "fix_branding_translations.py"
+$python = Get-Command python -ErrorAction SilentlyContinue
+if (-not $python) { $python = Get-Command python3 -ErrorAction SilentlyContinue }
+if (-not $python) {
+    Write-Error "python not found on PATH - required to run fix_branding_translations.py."
+    exit 1
 }
- 
-Write-Output "Renamed product in $replacedCount string files (.grd/.grdp/.xtb)."
+& $python.Source $fixScript $dst
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "fix_branding_translations.py failed with exit code $LASTEXITCODE."
+    exit 1
+}
+
 Write-Output "Branding fully applied over build\src."
