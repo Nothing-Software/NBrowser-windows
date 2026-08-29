@@ -20,7 +20,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / 'ungoogled-chromium' / 'utils'))
 import downloads
-import domain_substitution
 import prune_binaries
 import patches
 from _common import ENCODING, USE_REGISTRY, ExtractorEnum, get_logger
@@ -330,14 +329,10 @@ def main():
             patch_bin_path=(source_tree / _PATCH_BIN_RELPATH)
         )
 
-        # Substitute domains
-        domain_substitution_list = (_ROOT_DIR / 'ungoogled-chromium' / 'domain_substitution.list') if args.tarball else (_ROOT_DIR  / 'domain_substitution.list')
-        domain_substitution.apply_substitution(
-            _ROOT_DIR / 'ungoogled-chromium' / 'domain_regex.list',
-            domain_substitution_list,
-            source_tree,
-            None
-        )
+        # Domain substitution intentionally skipped: it rewrites domains like
+        # google.com into non-resolving lookalikes throughout the source tree,
+        # which breaks real functionality (e.g. the Chrome Web Store) without
+        # actually blocking any network request — NBrowser doesn't ship it.
         _apply_branding(source_tree)
 
     # Check if rust-toolchain folder has been populated
