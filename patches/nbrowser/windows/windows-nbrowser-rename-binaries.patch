@@ -1,0 +1,385 @@
+diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
+--- a/chrome/BUILD.gn
++++ b/chrome/BUILD.gn
+@@ -109,7 +109,7 @@ if (!is_android && !is_mac) {
+     data_deps = [ ":chrome_initial" ]
+   }
+ 
+-  _chrome_output_name = "chrome"
++  _chrome_output_name = "nbrowser"
+ 
+   executable("chrome_initial") {
+     configs -= [ "//build/config/compiler:thinlto_optimize_default" ]
+@@ -371,7 +371,7 @@ if (is_win) {
+       "app/startup_timestamps.h",
+     ]
+ 
+-    output_name = "chrome"
++    output_name = "nbrowser"
+ 
+     deps = [
+       ":chrome_dll_manifest",
+@@ -1622,7 +1622,7 @@ if (is_android) {
+ if (is_win && enable_resource_allowlist_generation) {
+   generate_resource_allowlist("resource_allowlist") {
+     deps = [ ":chrome_dll" ]
+-    inputs = [ "$root_out_dir/chrome.dll.pdb" ]
++    inputs = [ "$root_out_dir/nbrowser.dll.pdb" ]
+     output = _chrome_resource_allowlist
+   }
+ }
+diff --git a/chrome/app/version_assembly/version_assembly_manifest.template b/chrome/app/version_assembly/version_assembly_manifest.template
+index 9bd1fc58f9..60205c9551 100644
+--- a/chrome/app/version_assembly/version_assembly_manifest.template
++++ b/chrome/app/version_assembly/version_assembly_manifest.template
+@@ -4,5 +4,5 @@
+       name='@MAJOR@.@MINOR@.@BUILD@.@PATCH@'
+       version='@MAJOR@.@MINOR@.@BUILD@.@PATCH@'
+       type='win32'/>
+-  <file name='chrome_elf.dll'/>
++  <file name='nbrowser_elf.dll'/>
+ </assembly>
+diff --git a/chrome/browser/safe_browsing/incident_reporting/binary_integrity_analyzer_win.cc b/chrome/browser/safe_browsing/incident_reporting/binary_integrity_analyzer_win.cc
+index ae9775564c..2e6f0804ca 100644
+--- a/chrome/browser/safe_browsing/incident_reporting/binary_integrity_analyzer_win.cc
++++ b/chrome/browser/safe_browsing/incident_reporting/binary_integrity_analyzer_win.cc
+@@ -24,12 +24,12 @@ namespace safe_browsing {
+ 
+ std::vector<base::FilePath> GetCriticalBinariesPath() {
+   static constexpr auto kUnversionedFiles = std::to_array({
+-      FILE_PATH_LITERAL("chrome.exe"),
++      FILE_PATH_LITERAL("nbrowser.exe"),
+   });
+   static constexpr auto kVersionedFiles = std::to_array({
+-      FILE_PATH_LITERAL("chrome.dll"),
+-      FILE_PATH_LITERAL("chrome_child.dll"),
+-      FILE_PATH_LITERAL("chrome_elf.dll"),
++      FILE_PATH_LITERAL("nbrowser.dll"),
++      FILE_PATH_LITERAL("nbrowser_child.dll"),
++      FILE_PATH_LITERAL("nbrowser_elf.dll"),
+   });
+ 
+   // Find where chrome.exe is installed.
+diff --git a/chrome/browser/safe_browsing/incident_reporting/binary_integrity_analyzer_win_unittest.cc b/chrome/browser/safe_browsing/incident_reporting/binary_integrity_analyzer_win_unittest.cc
+index c53aac08cd..0fb6728ec3 100644
+--- a/chrome/browser/safe_browsing/incident_reporting/binary_integrity_analyzer_win_unittest.cc
++++ b/chrome/browser/safe_browsing/incident_reporting/binary_integrity_analyzer_win_unittest.cc
+@@ -29,10 +29,10 @@ namespace safe_browsing {
+ 
+ namespace {
+ 
+-const wchar_t kChromeDll[] = L"chrome.dll";
+-const wchar_t kChromeChildDll[] = L"chrome_child.dll";
+-const wchar_t kChromeElfDll[] = L"chrome_elf.dll";
+-const wchar_t kChromeExe[] = L"chrome.exe";
++const wchar_t kChromeDll[] = L"nbrowser.dll";
++const wchar_t kChromeChildDll[] = L"nbrowser_child.dll";
++const wchar_t kChromeElfDll[] = L"nbrowser_elf.dll";
++const wchar_t kChromeExe[] = L"nbrowser.exe";
+ const wchar_t kSignedBinaryDll[] = L"signed_binary.dll";
+ 
+ // Helper function to erase the content of a binary to make sure the signature
+@@ -139,7 +139,7 @@ TEST_F(BinaryIntegrityAnalyzerWinTest, VerifyBinaryIntegrity) {
+       incident->TakePayload());
+   ASSERT_TRUE(incident_data->has_binary_integrity());
+   ASSERT_TRUE(incident_data->binary_integrity().has_file_basename());
+-  ASSERT_EQ("chrome_elf.dll",
++  ASSERT_EQ("nbrowser_elf.dll",
+             incident_data->binary_integrity().file_basename());
+   ASSERT_TRUE(incident_data->binary_integrity().has_signature());
+ }
+diff --git a/chrome/browser/safe_browsing/incident_reporting/environment_data_collection_win.cc b/chrome/browser/safe_browsing/incident_reporting/environment_data_collection_win.cc
+index a9efe9238d..c998e21eab 100644
+--- a/chrome/browser/safe_browsing/incident_reporting/environment_data_collection_win.cc
++++ b/chrome/browser/safe_browsing/incident_reporting/environment_data_collection_win.cc
+@@ -36,8 +36,8 @@ const REGSAM kKeyReadNoNotify = (KEY_READ) & ~(KEY_NOTIFY);
+ 
+ // The modules on which we will run VerifyModule.
+ constexpr std::array<const wchar_t*, 3> kModulesToVerify = {{
+-    L"chrome.dll",
+-    L"chrome_elf.dll",
++    L"nbrowser.dll",
++    L"nbrowser_elf.dll",
+     L"ntdll.dll",
+ }};
+ 
+diff --git a/chrome/chrome_elf/BUILD.gn b/chrome/chrome_elf/BUILD.gn
+index 0e3bd558ba..b8cec4e2fd 100644
+--- a/chrome/chrome_elf/BUILD.gn
++++ b/chrome/chrome_elf/BUILD.gn
+@@ -49,6 +49,8 @@ static_library("test_stubs") {
+ }
+ 
+ shared_library("chrome_elf") {
++  output_name = "nbrowser_elf"
++
+   sources = [
+     "chrome_elf.def",
+     "chrome_elf_main.cc",
+diff --git a/chrome/chrome_elf/chrome_elf.def b/chrome/chrome_elf/chrome_elf.def
+index 7303c69c58..9c19c7a653 100644
+--- a/chrome/chrome_elf/chrome_elf.def
++++ b/chrome/chrome_elf/chrome_elf.def
+@@ -1,7 +1,7 @@
+ ; Copyright 2013 The Chromium Authors
+ ; Use of this source code is governed by a BSD-style license that can be
+ ; found in the LICENSE file.
+-LIBRARY  "chrome_elf.dll"
++LIBRARY  "nbrowser_elf.dll"
+ 
+ EXPORTS
+   ; From components/crash/core/app/crash_export_stubs.cc
+diff --git a/chrome/common/chrome_constants.cc b/chrome/common/chrome_constants.cc
+index 6e30ef1147..3760fbe1dd 100644
+--- a/chrome/common/chrome_constants.cc
++++ b/chrome/common/chrome_constants.cc
+@@ -32,9 +32,9 @@ const char kChromeVersion[] = CHROME_VERSION_STRING;
+ 
+ #if BUILDFLAG(IS_WIN)
+ const base::FilePath::CharType kBrowserProcessExecutableName[] =
+-    FPL("chrome.exe");
++    FPL("nbrowser.exe");
+ const base::FilePath::CharType kHelperProcessExecutableName[] =
+-    FPL("chrome.exe");
++    FPL("nbrowser.exe");
+ #elif BUILDFLAG(IS_MAC)
+ const base::FilePath::CharType kBrowserProcessExecutableName[] =
+     FPL(PRODUCT_FULLNAME_STRING);
+@@ -54,9 +54,9 @@ const base::FilePath::CharType kHelperProcessExecutableName[] = FPL("exe");
+ 
+ #if BUILDFLAG(IS_WIN)
+ const base::FilePath::CharType kBrowserProcessExecutablePath[] =
+-    FPL("chrome.exe");
++    FPL("nbrowser.exe");
+ const base::FilePath::CharType kHelperProcessExecutablePath[] =
+-    FPL("chrome.exe");
++    FPL("nbrowser.exe");
+ #elif BUILDFLAG(IS_MAC)
+ const base::FilePath::CharType kBrowserProcessExecutablePath[] =
+     FPL(PRODUCT_FULLNAME_STRING ".app/Contents/MacOS/" PRODUCT_FULLNAME_STRING);
+@@ -88,8 +88,8 @@ const char kMacHelperSuffixAlerts[] = " (Alerts)";
+ #endif  // BUILDFLAG(IS_MAC)
+ 
+ #if BUILDFLAG(IS_WIN)
+-const base::FilePath::CharType kBrowserResourcesDll[] = FPL("chrome.dll");
+-const base::FilePath::CharType kElfDll[] = FPL("chrome_elf.dll");
++const base::FilePath::CharType kBrowserResourcesDll[] = FPL("nbrowser.dll");
++const base::FilePath::CharType kElfDll[] = FPL("nbrowser_elf.dll");
+ const base::FilePath::CharType kStatusTrayWindowClass[] =
+     FPL("Chrome_StatusTrayWindow");
+ #endif  // BUILDFLAG(IS_WIN)
+diff --git a/chrome/elevation_service/caller_validation_unittest.cc b/chrome/elevation_service/caller_validation_unittest.cc
+index 5306c05bd4..c7b36146c3 100644
+--- a/chrome/elevation_service/caller_validation_unittest.cc
++++ b/chrome/elevation_service/caller_validation_unittest.cc
+@@ -236,7 +236,7 @@ TEST_F(CallerValidationTest, PathValidationFuzzyPathMatch) {
+   // Invalid subdir 'Blah'.
+   ASSERT_NO_FATAL_FAILURE(
+       VerifyValidationResult(app1_path, app5_path, /*expected_match=*/false));
+-  // Case for rename of chrome.exe to new_chrome.exe during install.
++  // Case for rename of nbrowser.exe to new_nbrowser.exe during install.
+   ASSERT_NO_FATAL_FAILURE(
+       VerifyValidationResult(app2_path, app3_path, /*expected_match=*/true));
+   // 'Temp' and 'Application' should both normalize to each other.
+@@ -285,32 +285,32 @@ TEST_F(CallerValidationTest, TrimProcessPath) {
+     base::FilePath::StringViewType input;
+     base::FilePath::StringViewType expected;
+   } cases[] = {
+-      {L"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
++      {L"C:\\Program Files\\Google\\Chrome\\Application\\nbrowser.exe",
+        L"C:\\Program Files\\Google\\Chrome"},
+-      {L"C:\\Program Files\\Google\\Chrome\\Temp\\chrome.exe",
++      {L"C:\\Program Files\\Google\\Chrome\\Temp\\nbrowser.exe",
+        L"C:\\Program Files\\Google\\Chrome"},
+-      {L"C:\\Program Files (x86)\\Google\\Chrome\\Temp\\chrome.exe",
++      {L"C:\\Program Files (x86)\\Google\\Chrome\\Temp\\nbrowser.exe",
+        L"C:\\Program Files\\Google\\Chrome"},
+-      {L"C:\\Program Files (x86)\\Google\\Chrome\\Blah\\chrome.exe",
++      {L"C:\\Program Files (x86)\\Google\\Chrome\\Blah\\nbrowser.exe",
+        L"C:\\Program Files\\Google\\Chrome\\Blah"},
+       {L"C:\\Dir\\app.exe", L"C:\\Dir"},
+       {L"C:\\Dir\\", L"C:\\Dir"},
+       {L"C:\\Dir", L"C:\\Dir"},
+       {L"C:\\Program Files "
+-       L"(x86)\\Google\\Chrome\\Temp\\scoped_dir11452_73964817\\chrome.exe",
++       L"(x86)\\Google\\Chrome\\Temp\\scoped_dir11452_73964817\\nbrowser.exe",
+        L"C:\\Program Files\\Google\\Chrome"},
+       {L"C:\\Program Files "
+-       L"(x86)\\Google\\Chrome\\scoped_dir11452_73964817\\Temp\\chrome.exe",
++       L"(x86)\\Google\\Chrome\\scoped_dir11452_73964817\\Temp\\nbrowser.exe",
+        L"C:\\Program Files\\Google\\Chrome\\scoped_dir11452_73964817"},
+-      {L"C:\\Program Files (x86)\\Google\\scoped_dir1\\Chrome\\chrome.exe",
++      {L"C:\\Program Files (x86)\\Google\\scoped_dir1\\Chrome\\nbrowser.exe",
+        L"C:\\Program Files\\Google\\scoped_dir1\\Chrome"},
+       {L"C:\\Temp\\Program Files "
+-       L"(x86)\\Google\\scoped_dir1\\Chrome\\chrome.exe",
++       L"(x86)\\Google\\scoped_dir1\\Chrome\\nbrowser.exe",
+        L"C:\\Temp\\Program Files\\Google\\scoped_dir1\\Chrome"},
+       {L"C:\\scoped_dir1234\\Program Files "
+-       L"(x86)\\Google\\scoped_dir1234\\Chrome\\chrome.exe",
++       L"(x86)\\Google\\scoped_dir1234\\Chrome\\nbrowser.exe",
+        L"C:\\scoped_dir1234\\Program Files\\Google\\scoped_dir1234\\Chrome"},
+-      {L"C:\\Program Files\\Google\\Chrome\\Application\\1.2.3.4\\chrome.exe",
++      {L"C:\\Program Files\\Google\\Chrome\\Application\\1.2.3.4\\nbrowser.exe",
+        L"C:\\Program Files\\Google\\Chrome"},
+   };
+ 
+diff --git a/chrome/elevation_service/fuzz.dict b/chrome/elevation_service/fuzz.dict
+index 91ba41e0ae..b3f3933aff 100644
+--- a/chrome/elevation_service/fuzz.dict
++++ b/chrome/elevation_service/fuzz.dict
+@@ -7,7 +7,7 @@
+ "Application"
+ "Temp"
+ "Chrome"
+-"chrome.exe"
++"nbrowser.exe"
+ "\\"
+ "C:"
+ "D:"
+diff --git a/chrome/installer/mini_installer/BUILD.gn b/chrome/installer/mini_installer/BUILD.gn
+--- a/chrome/installer/mini_installer/BUILD.gn
++++ b/chrome/installer/mini_installer/BUILD.gn
+@@ -146,9 +146,9 @@ action("mini_installer_archive") {
+   release_file = "chrome.release"
+ 
+   inputs = [
+-    "$root_out_dir/chrome.dll",
+-    "$root_out_dir/chrome_elf.dll",
+-    "$root_out_dir/chrome.exe",
++    "$root_out_dir/nbrowser.dll",
++    "$root_out_dir/nbrowser_elf.dll",
++    "$root_out_dir/nbrowser.exe",
+     "$root_out_dir/locales/en-US.pak",
+     "$root_out_dir/setup.exe",
+     "//chrome/tools/build/win/makecab.py",
+diff --git a/chrome/installer/mini_installer/chrome.release b/chrome/installer/mini_installer/chrome.release
+index 5add215198..8a18820d83 100644
+--- a/chrome/installer/mini_installer/chrome.release
++++ b/chrome/installer/mini_installer/chrome.release
+@@ -6,7 +6,7 @@
+ #
+ # Chrome Application dir entries, sorted alphabetically.
+ #
+-chrome.exe: %(ChromeDir)s\
++nbrowser.exe: %(ChromeDir)s\
+ chrome_proxy.exe: %(ChromeDir)s\
+ #
+ # Chrome version dir assembly manifest.
+@@ -18,10 +18,10 @@ chrome_proxy.exe: %(ChromeDir)s\
+ #
+ # Chrome version dir entries, sorted alphabetically.
+ #
+-chrome.dll: %(VersionDir)s\
++nbrowser.dll: %(VersionDir)s\
+ chrome_100_percent.pak: %(VersionDir)s\
+-chrome_child.dll: %(VersionDir)s\
+-chrome_elf.dll: %(VersionDir)s\
++nbrowser_child.dll: %(VersionDir)s\
++nbrowser_elf.dll: %(VersionDir)s\
+ chrome_pwa_launcher.exe: %(VersionDir)s\
+ chrome_wer.dll: %(VersionDir)s\
+ d3dcompiler_47.dll: %(VersionDir)s\
+diff --git a/chrome/installer/util/util_constants.cc b/chrome/installer/util/util_constants.cc
+index fa3e16293f..a69c76f0bb 100644
+--- a/chrome/installer/util/util_constants.cc
++++ b/chrome/installer/util/util_constants.cc
+@@ -178,10 +178,10 @@ const char kVerboseLogging[] = "verbose-logging";
+ // TODO(gab): Rename setup.exe itself altogether and use the same binary for
+ // Active Setup.
+ const wchar_t kActiveSetupExe[] = L"chrmstp.exe";
+-const wchar_t kChromeDll[] = L"chrome.dll";
+-const wchar_t kChromeExe[] = L"chrome.exe";
+-const wchar_t kChromeNewExe[] = L"new_chrome.exe";
+-const wchar_t kChromeOldExe[] = L"old_chrome.exe";
++const wchar_t kChromeDll[] = L"nbrowser.dll";
++const wchar_t kChromeExe[] = L"nbrowser.exe";
++const wchar_t kChromeNewExe[] = L"new_nbrowser.exe";
++const wchar_t kChromeOldExe[] = L"old_nbrowser.exe";
+ const wchar_t kChromeProxyExe[] = L"chrome_proxy.exe";
+ const wchar_t kChromeProxyNewExe[] = L"new_chrome_proxy.exe";
+ const wchar_t kChromeProxyOldExe[] = L"old_chrome_proxy.exe";
+diff --git a/chrome/test/BUILD.gn b/chrome/test/BUILD.gn
+--- a/chrome/test/BUILD.gn
++++ b/chrome/test/BUILD.gn
+@@ -6613,7 +6613,7 @@ test("unit_tests") {
+       "../common/win/delay_load_notify_hook_unittest.cc",
+     ]
+ 
+-    data += [ "$root_out_dir/chrome.exe" ]
++    data += [ "$root_out_dir/nbrowser.exe" ]
+ 
+     data_deps += [
+       "//chrome",
+@@ -11062,7 +11062,7 @@ if (is_win) {
+     # the //chrome target to bundle up both initial/chrome.exe and chrome.exe.
+     # As a workaround, explicitly include a data dep on just chrome.exe, and
+     # add //chrome to deps above to make sure it's been built.
+-    data = [ "$root_out_dir/chrome.exe" ]
++    data = [ "$root_out_dir/nbrowser.exe" ]
+ 
+     # Don't want the test-specific dependencies to affect load tests.
+     # In particular, a few system DLLs cause user32 to be loaded, which is bad.
+diff --git a/chrome/tools/build/win/FILES.cfg b/chrome/tools/build/win/FILES.cfg
+index 64b6061c28..47936ea13a 100644
+--- a/chrome/tools/build/win/FILES.cfg
++++ b/chrome/tools/build/win/FILES.cfg
+@@ -48,23 +48,23 @@ FILES = [
+     'optional': ['official'],
+   },
+   {
+-    'filename': 'chrome.exe',
++    'filename': 'nbrowser.exe',
+     'buildtype': ['official'],
+     'filegroup': ['default', 'symsrc'],
+   },
+   {
+-    'filename': 'chrome.dll',
++    'filename': 'nbrowser.dll',
+     'buildtype': ['official'],
+     'filegroup': ['default', 'symsrc'],
+   },
+   {
+-    'filename': 'chrome_child.dll',
++    'filename': 'nbrowser_child.dll',
+     'buildtype': ['official'],
+     'filegroup': ['default', 'symsrc'],
+     'optional': ['official'],
+   },
+   {
+-    'filename': 'chrome_elf.dll',
++    'filename': 'nbrowser_elf.dll',
+     'buildtype': ['official'],
+     'filegroup': ['default', 'symsrc'],
+   },
+@@ -610,18 +610,18 @@ FILES = [
+     'archive': 'chrome-win32-syms.zip',
+   },
+   {
+-    'filename': 'chrome.dll.pdb',
++    'filename': 'nbrowser.dll.pdb',
+     'buildtype': ['official'],
+     'archive': 'chrome-win32-syms.zip',
+   },
+   {
+-    'filename': 'chrome_child.dll.pdb',
++    'filename': 'nbrowser_child.dll.pdb',
+     'buildtype': ['official'],
+     'optional': ['official'],
+     'archive': 'chrome-win32-syms.zip',
+   },
+   {
+-    'filename': 'chrome_elf.dll.pdb',
++    'filename': 'nbrowser_elf.dll.pdb',
+     'buildtype': ['official'],
+     'archive': 'chrome-win32-syms.zip',
+   },
+@@ -631,7 +631,7 @@ FILES = [
+     'archive': 'chrome-win32-syms.zip',
+   },
+   {
+-    'filename': 'chrome.exe.pdb',
++    'filename': 'nbrowser.exe.pdb',
+     'buildtype': ['official'],
+     'archive': 'chrome-win32-syms.zip',
+   },
