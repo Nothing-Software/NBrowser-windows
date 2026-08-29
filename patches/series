@@ -22,6 +22,7 @@ ungoogled-chromium/windows/windows-fix-remove-unused-preferences-fields.patch
 ungoogled-chromium/windows/windows-fix-missing-includes.patch
 ungoogled-chromium/windows/windows-fix-unsupported-llvm-flags.patch
 nbrowser/windows/windows-nbrowser-identity.patch
+nbrowser/windows/windows-nbrowser-rename-binaries.patch
 nbrowser/windows/windows-nbrowser-increment-icon-version.patch
 nbrowser/windows/windows-nbrowser-external-extensions.patch
 nbrowser/windows/windows-nbrowser-default-flags.patch
