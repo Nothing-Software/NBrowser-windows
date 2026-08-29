@@ -34,7 +34,7 @@ _CWS_URL = ('https://github.com/NeverDecaf/chromium-web-store/releases/download/
             'v{}/Chromium.Web.Store.crx'.format(_CWS_VERSION))
 _CWS_SHA256 = '326443baec3d204b1358eba6aa025cf6bd930c08a0b98f6784e7a3236528445b'
 _BRAND_NAME = 'NBrowser'
-_COMPANY_NAME = 'NothingSoftware'
+_COMPANY_NAME = 'Nothing Software'
 
 """
 !!Credit to Aerium Browser!!
@@ -131,6 +131,28 @@ def _apply_branding(source_tree):
                 path.write_text(new_text, encoding='utf-8')
                 replaced_count += 1
     get_logger().info('Renamed product in %d string files', replaced_count)
+
+def _apply_overlay(source_tree):
+    """
+    Mirror-copies nbrowser/overlay/ over source_tree - new or fully-rewritten
+    source files that live alongside the diff-based patches/. Must run after
+    _apply_branding(): overlay content is already final NBrowser text, and
+    running the branding string sweep over it afterward would mangle any
+    literal "Chromium" substring it contains (e.g. in comments).
+    """
+    overlay_dir = _ROOT_DIR / 'nbrowser' / 'overlay'
+    if not overlay_dir.exists():
+        return
+    copied = 0
+    for src_path in overlay_dir.rglob('*'):
+        if not src_path.is_file():
+            continue
+        rel = src_path.relative_to(overlay_dir)
+        dst_path = source_tree / rel
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src_path, dst_path)
+        copied += 1
+    get_logger().info('Applied %d overlay files', copied)
 
 def _get_vcvars_path(name='64'):
     """
@@ -334,6 +356,7 @@ def main():
         # which breaks real functionality (e.g. the Chrome Web Store) without
         # actually blocking any network request — NBrowser doesn't ship it.
         _apply_branding(source_tree)
+        _apply_overlay(source_tree)
 
     # Check if rust-toolchain folder has been populated
     HOST_CPU_IS_64BIT = sys.maxsize > 2**32
