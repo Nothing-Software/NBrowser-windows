@@ -1,11 +1,10 @@
 diff --git a/chrome/browser/resources/settings/about_page/about_page.html.ts b/chrome/browser/resources/settings/about_page/about_page.html.ts
-index 0000000000..0000000000 100644
 --- a/chrome/browser/resources/settings/about_page/about_page.html.ts
 +++ b/chrome/browser/resources/settings/about_page/about_page.html.ts
-@@ -110,9 +110,6 @@
+@@ -117,9 +117,6 @@ export function getHtml(this: SettingsAboutPageElement) {
        <div class="secondary">$i18n{aboutProductCopyright}</div>
      </div>
-
+ 
 -    <div class="info-section">
 -      <div class="secondary">$i18nRaw{aboutProductLicense}</div>
 -    </div>
@@ -13,19 +12,18 @@ index 0000000000..0000000000 100644
      <div class="secondary">
        <a id="tos" href="$i18n{aboutTermsURL}">$i18n{aboutProductTos}</a>
 diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-index 0000000000..0000000000 100644
 --- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
 +++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-@@ -350,12 +350,6 @@
-       base::i18n::MessageFormatter::FormatWithNumberedArgs(
+@@ -351,12 +351,6 @@ void AddAboutStrings(content::WebUIDataSource* html_source, Profile* profile) {
            l10n_util::GetStringUTF16(IDS_ABOUT_VERSION_COPYRIGHT),
            base::Time::Now()));
--
+ 
 -  std::u16string license = l10n_util::GetStringFUTF16(
 -      IDS_VERSION_UI_LICENSE, chrome::kChromiumProjectURL,
 -      chrome::kChromeUICreditsURL16,
 -      l10n_util::GetStringUTF16(IDS_SETTINGS_OPENS_IN_NEW_TAB));
 -  html_source->AddString("aboutProductLicense", license);
-
+-
    html_source->AddBoolean("aboutObsoleteNowOrSoon",
                            ObsoleteSystem::IsObsoleteNowOrSoon());
+   html_source->AddBoolean("aboutObsoleteEndOfTheLine",
