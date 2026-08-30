@@ -142,6 +142,17 @@
       <message name="IDS_NTP_CUSTOMIZE_SAVE_PRESET_BUTTON" desc="Label for the button that saves the current custom primary/secondary/accent colors as a new reusable preset.">
         Save Preset
       </message>
+
+      <!-- NBrowser GitHub Releases update infobar (chrome/browser/ui/startup/nbrowser_update_infobar_delegate.cc). No <ph> placeholder here on purpose - the project's translation fingerprint tooling (fix_branding_translations.py / check_nbrowser_translations.py) can't reliably recompute grit's real id for placeholder-bearing messages (see NBrowser_Localization_Guide.md section 2's "Ограничение"), so NBrowser-authored strings in this shared bundle stay plain text. -->
+      <message name="IDS_NBROWSER_UPDATE_AVAILABLE_INFOBAR_TEXT" desc="Text shown in the infobar offering to update NBrowser to a newer version found on GitHub Releases.">
+        A new version of NBrowser is available.
+      </message>
+      <message name="IDS_NBROWSER_UPDATE_AVAILABLE_INFOBAR_BUTTON_LABEL" desc="Label of the button in the NBrowser update infobar that downloads and launches the new version's installer.">
+        Update
+      </message>
+      <message name="IDS_NBROWSER_UPDATE_INSTALLER_LAUNCH_FAILED" desc="Status message on chrome://settings/help when downloading or launching the update installer fails.">
+        Couldn't download the update. Try again later.
+      </message>
     </messages>
   </release>
 </grit>
