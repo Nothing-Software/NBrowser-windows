@@ -1,6 +1,5 @@
-// Copyright 2026 The NBrowser Authors
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// Copyright 2026 The Nothing Software Authors
+// Use of this source code is governed by a BSD-style license
 
 #ifndef CHROME_BROWSER_UI_STARTUP_NBROWSER_UPDATE_CHECKER_H_
 #define CHROME_BROWSER_UI_STARTUP_NBROWSER_UPDATE_CHECKER_H_

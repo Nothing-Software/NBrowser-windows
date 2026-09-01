@@ -1,6 +1,5 @@
-// Copyright 2026 The NBrowser Authors
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// Copyright 2026 The Nothing Software Authors
+// Use of this source code is governed by a BSD-style license
 
 #include "chrome/browser/ui/startup/nbrowser_update_prompt.h"
 
@@ -8,10 +7,12 @@
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/ui/startup/nbrowser_update_checker.h"
 #include "chrome/browser/ui/startup/nbrowser_update_infobar_delegate.h"
+#include "chrome/browser/ui/startup/nbrowser_update_installer_launcher.h"
 #include "chrome/browser/ui/startup/nbrowser_update_prefs.h"
 #include "components/infobars/content/content_infobar_manager.h"
 #include "components/prefs/pref_service.h"
@@ -33,7 +34,21 @@ void OnUpdateCheckComplete(base::WeakPtr<content::WebContents> web_contents,
   g_browser_process->local_state()->SetBoolean(
       prefs::kUpdateAvailableDotVisible, update && !already_declined);
 
-  if (!update || already_declined || !web_contents) {
+  if (!update || already_declined) {
+    return;
+  }
+
+  if (g_browser_process->local_state()->GetBoolean(
+          prefs::kUpdateAutoInstallEnabled)) {
+    // The user has opted into unattended updates - install it directly,
+    // same as version_updater_win.cc does for the About page in this mode.
+    // No infobar, nothing left to decline.
+    DownloadAndLaunchInstaller(update->installer_download_url,
+                               base::DoNothing());
+    return;
+  }
+
+  if (!web_contents) {
     return;
   }
 

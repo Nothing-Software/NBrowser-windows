@@ -1,6 +1,5 @@
-// Copyright 2026 The NBrowser Authors
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// Copyright 2026 The Nothing Software Authors
+// Use of this source code is governed by a BSD-style license
 
 #ifndef CHROME_BROWSER_UI_STARTUP_NBROWSER_UPDATE_PREFS_H_
 #define CHROME_BROWSER_UI_STARTUP_NBROWSER_UPDATE_PREFS_H_
@@ -25,6 +24,18 @@ inline constexpr char kUpdateIgnoredReleaseTag[] =
 // most recent check - it is not itself per-release like the pref above.
 inline constexpr char kUpdateAvailableDotVisible[] =
     "nbrowser.update_available_dot_visible";
+
+// Bool Local State pref: whether the user has opted into unattended
+// updates. Off by default - both entry points (the startup infobar and the
+// chrome://settings/help page) require an explicit click before downloading
+// anything. On, both entry points install a found update without asking.
+// Set from chrome://settings/help via AboutHandler::
+// HandleSetUpdateAutoInstallEnabled (see
+// patches/nbrowser/windows/windows-nbrowser-github-updater.patch); read from
+// nbrowser_update_prompt.cc (startup infobar) and version_updater_win.cc
+// (About page).
+inline constexpr char kUpdateAutoInstallEnabled[] =
+    "nbrowser.update_auto_install_enabled";
 
 }  // namespace chrome::startup::nbrowser_update::prefs
 

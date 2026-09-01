@@ -39,3 +39,12 @@ index e1f3030f0c..792699ed97 100644
    # END chrome/browser section.
 
    # START chrome/ WebUI resources section
+@@ -198,7 +201,7 @@
+   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/about_sys/resources.grd": {
+     # Big alignment at start of section.
+     "META": {"align": 100, "sizes": {"includes": [10]}},
+-    "includes": [2700],
++    "includes": [2710],
+   },
+   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/access_code_cast/resources.grd": {
+     "META": {"sizes": {"includes": [50]}},

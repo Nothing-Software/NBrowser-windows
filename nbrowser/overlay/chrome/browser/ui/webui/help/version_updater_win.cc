@@ -1,6 +1,5 @@
-// Copyright 2026 The NBrowser Authors
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// Copyright 2026 The Nothing Software Authors
+// Use of this source code is governed by a BSD-style license
 //
 // NBrowser: this file fully replaces upstream's version_updater_win.cc.
 // Upstream's VersionUpdaterWin drives the chrome://settings/help "About"
@@ -25,9 +24,13 @@
 
 #include "base/functional/bind.h"
 #include "base/memory/weak_ptr.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/ui/startup/nbrowser_update_checker.h"
 #include "chrome/browser/ui/startup/nbrowser_update_installer_launcher.h"
+#include "chrome/browser/ui/startup/nbrowser_update_prefs.h"
+#include "chrome/browser/ui/startup/nbrowser_update_prompt.h"
 #include "chrome/browser/ui/webui/nbrowser_ui_strings/grit/nbrowser_ui_strings.h"
+#include "components/prefs/pref_service.h"
 #include "components/version_info/version_info.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -39,7 +42,9 @@ namespace {
 // Google Update.
 class VersionUpdaterWin : public VersionUpdater {
  public:
-  VersionUpdaterWin() = default;
+  explicit VersionUpdaterWin(content::WebContents* web_contents)
+      : web_contents_(web_contents ? web_contents->GetWeakPtr()
+                                   : base::WeakPtr<content::WebContents>()) {}
 
   VersionUpdaterWin(const VersionUpdaterWin&) = delete;
   VersionUpdaterWin& operator=(const VersionUpdaterWin&) = delete;
@@ -73,6 +78,24 @@ class VersionUpdaterWin : public VersionUpdater {
       return;
     }
 
+    if (!g_browser_process->local_state()->GetBoolean(
+            chrome::startup::nbrowser_update::prefs::
+                kUpdateAutoInstallEnabled)) {
+      // The user hasn't opted into unattended updates - don't silently
+      // download and run an installer just because this page was opened.
+      // Defer to the same consent-gated infobar the startup path uses
+      // (which re-checks GitHub itself); this page just reflects that an
+      // update is pending rather than tracking its own separate progress.
+      if (web_contents_) {
+        chrome::startup::nbrowser_update::MaybeShowUpdatePrompt(
+            web_contents_.get());
+      }
+      callback_.Run(DEFERRED, 0, false, false, std::string(), 0,
+                    l10n_util::GetStringUTF16(
+                        IDS_NBROWSER_UPDATE_AVAILABLE_ABOUT_PAGE_TEXT));
+      return;
+    }
+
     callback_.Run(UPDATING, 0, false, false, std::string(), 0,
                   std::u16string());
     chrome::startup::nbrowser_update::DownloadAndLaunchInstaller(
@@ -103,6 +126,13 @@ class VersionUpdaterWin : public VersionUpdater {
   // Callback used to communicate update status to the client.
   StatusCallback callback_;
 
+  // The chrome://settings/help tab this instance serves - used to attach
+  // the consent infobar (see OnCheckComplete()) to the same tab when the
+  // user hasn't opted into unattended updates. May be null (per the base
+  // class's Create() contract) or have since been closed; both are handled
+  // as "don't show anything" rather than a crash.
+  base::WeakPtr<content::WebContents> web_contents_;
+
   // Used for callbacks.
   base::WeakPtrFactory<VersionUpdaterWin> weak_factory_{this};
 };
@@ -111,5 +141,5 @@ class VersionUpdaterWin : public VersionUpdater {
 
 std::unique_ptr<VersionUpdater> VersionUpdater::Create(
     content::WebContents* web_contents) {
-  return std::make_unique<VersionUpdaterWin>();
+  return std::make_unique<VersionUpdaterWin>(web_contents);
 }

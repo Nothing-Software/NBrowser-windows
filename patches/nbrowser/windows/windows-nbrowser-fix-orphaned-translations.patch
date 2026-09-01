@@ -1,3 +1,11 @@
+diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
+--- a/chrome/app/generated_resources.grd
++++ b/chrome/app/generated_resources.grd
+@@ -19085,3 +19085,3 @@
+       <message name="IDS_NON_MILESTONE_UPDATE_TOAST_BODY" desc="Text on a toast notification that is shown when a non milestone update is complete.">
+-        Chrome was updated
++        NBrowser was updated
+       </message>
 diff --git a/chrome/app/resources/chromium_strings_de.xtb b/chrome/app/resources/chromium_strings_de.xtb
 index fc9bc91199..4891706cdd 100644
 --- a/chrome/app/resources/chromium_strings_de.xtb
@@ -81,6 +89,9 @@ index ca595ab702..9c1a5e1cf8 100644
  <translation id="1001033507375626788">Dieses Netzwerk ist für dich freigegeben</translation>
  <translation id="1001360573085135660">Klicke, um die Berechtigung zu aktivieren oder zu deaktivieren.</translation>
  <translation id="1002085272681738789">Tab wieder aktiv</translation>
+@@ -4805,1 +4805,1 @@
+-<translation id="4683143253481759090">Chrome wurde aktualisiert</translation>
++<translation id="1404727967523948720">NBrowser wurde aktualisiert</translation>
 diff --git a/chrome/app/resources/generated_resources_es.xtb b/chrome/app/resources/generated_resources_es.xtb
 index d0fa530a4b..62dbfd0c4e 100644
 --- a/chrome/app/resources/generated_resources_es.xtb
@@ -94,6 +105,9 @@ index d0fa530a4b..62dbfd0c4e 100644
  <translation id="1001033507375626788">Esta red se comparte contigo</translation>
  <translation id="1001360573085135660">Haz clic para activar o desactivar el permiso.</translation>
  <translation id="1002085272681738789">Pestaña activa de nuevo</translation>
+@@ -4807,1 +4807,1 @@
+-<translation id="4683143253481759090">Chrome se ha actualizado</translation>
++<translation id="1404727967523948720">NBrowser se ha actualizado</translation>
 diff --git a/chrome/app/resources/generated_resources_fr.xtb b/chrome/app/resources/generated_resources_fr.xtb
 index f01bc3be16..dcad1e8ca7 100644
 --- a/chrome/app/resources/generated_resources_fr.xtb
@@ -107,6 +121,9 @@ index f01bc3be16..dcad1e8ca7 100644
  <translation id="1001033507375626788">Ce réseau est partagé avec vous</translation>
  <translation id="1001360573085135660">Cliquer pour activer/désactiver l'autorisation.</translation>
  <translation id="1002085272681738789">Onglet de nouveau actif</translation>
+@@ -4805,1 +4805,1 @@
+-<translation id="4683143253481759090">Chrome a été mis à jour</translation>
++<translation id="1404727967523948720">NBrowser a été mis à jour</translation>
 diff --git a/chrome/app/resources/generated_resources_ru.xtb b/chrome/app/resources/generated_resources_ru.xtb
 index 47ab7f1f14..27cdbe33b0 100644
 --- a/chrome/app/resources/generated_resources_ru.xtb
@@ -129,6 +146,9 @@ index 47ab7f1f14..27cdbe33b0 100644
  <translation id="1999763610967697511">Перетаскивание</translation>
  <translation id="2002109485265116295">В режиме реального времени</translation>
  <translation id="2003130567827682533">Чтобы активировать службу передачи данных "<ph name="NAME" />", сначала подключитесь к сети Wi-Fi.</translation>
+@@ -4807,1 +4807,1 @@
+-<translation id="4683143253481759090">Chrome обновлен.</translation>
++<translation id="1404727967523948720">NBrowser обновлён.</translation>
 diff --git a/chrome/app/resources/generated_resources_zh-CN.xtb b/chrome/app/resources/generated_resources_zh-CN.xtb
 index 07aa76e713..dae79379c1 100644
 --- a/chrome/app/resources/generated_resources_zh-CN.xtb
@@ -142,3 +162,6 @@ index 07aa76e713..dae79379c1 100644
  <translation id="1001033507375626788">已与您共享该网络</translation>
  <translation id="1001360573085135660">点击即可切换权限。</translation>
  <translation id="1002085272681738789">标签页重新变为活动状态</translation>
+@@ -4804,1 +4804,1 @@
+-<translation id="4683143253481759090">Chrome 已更新</translation>
++<translation id="1404727967523948720">NBrowser 已更新</translation>

@@ -8,20 +8,15 @@
 
 --- a/components/infobars/core/infobar_delegate.h
 +++ b/components/infobars/core/infobar_delegate.h
-@@ -208,6 +208,10 @@
-     JS_OPTIMIZATIONS_INFOBAR_DELEGATE = 133,
-     WEB_APP_BLOCKED_MIGRATION_INFOBAR_DELEGATE = 134,
-     OSCRYPTASYNC_AVAILABILITY_INFOBAR_DELEGATE = 135,
+@@ -214,1 +214,5 @@
+    PASSWORD_SAVED_INFOBAR_DELEGATE_IOS = 139,
 +    // NBrowser-specific identifier - not part of upstream Chromium, so not
 +    // wired into the UMA enums.xml LINT.ThenChange this file otherwise
 +    // tracks (NBrowser collects no metrics for this to be logged against).
-+    NBROWSER_UPDATE_AVAILABLE_INFOBAR_DELEGATE = 136,
-   };
-   // LINT.ThenChange(//tools/metrics/histograms/metadata/browser/enums.xml:InfoBarIdentifier)
- 
++    NBROWSER_UPDATE_AVAILABLE_INFOBAR_DELEGATE = 140,
 --- a/chrome/browser/prefs/browser_prefs.cc
 +++ b/chrome/browser/prefs/browser_prefs.cc
-@@ -1389,6 +1389,13 @@
+@@ -1389,6 +1389,17 @@
    // below since these aren't owned by a subsystem.
    registry->RegisterBooleanPref("nbrowser.first_run_language_chosen", false);
    registry->RegisterBooleanPref("nbrowser.first_run_pending_relaunch", false);
@@ -31,6 +26,10 @@
 +  registry->RegisterStringPref("nbrowser.update_ignored_release_tag",
 +                               std::string());
 +  registry->RegisterBooleanPref("nbrowser.update_available_dot_visible",
++                                false);
++  // Whether the user has opted into unattended updates - see
++  // nbrowser_update_prefs.h.
++  registry->RegisterBooleanPref("nbrowser.update_auto_install_enabled",
 +                                false);
  
    // Call outs to individual subsystems that register Local State (browser-wide)
@@ -58,31 +57,56 @@
        startup_command_line.HasSwitch(switches::kNoDefaultBrowserCheck) ||
 --- a/chrome/browser/ui/startup/BUILD.gn
 +++ b/chrome/browser/ui/startup/BUILD.gn
-@@ -298,10 +298,23 @@
- 
-     if (is_win) {
-       sources += [
-+        "nbrowser_update_checker.cc",
-+        "nbrowser_update_infobar_delegate.cc",
-+        "nbrowser_update_installer_launcher.cc",
-+        "nbrowser_update_prompt.cc",
-         "startup_launch_infobar_delegate.cc",
-         "startup_launch_infobar_manager_impl.cc",
-       ]
--      deps += [ "//chrome/browser/startup" ]
+@@ -308,1 +308,4 @@
+       deps += [ "//chrome/browser/startup" ]
 +      deps += [
-+        "//chrome/app/vector_icons",
-+        "//chrome/browser/infobars",
-+        "//chrome/browser/startup",
-+        "//chrome/browser/ui/webui/nbrowser_ui_strings:strings",
-+        "//chrome/install_static:install_static_util",
-+        "//components/vector_icons",
-+        "//services/data_decoder/public/cpp",
-+        "//services/network/public/cpp",
++        ":nbrowser_update",
 +      ]
+@@ -600,5 +600,44 @@
+     if (!is_chromeos) {
+       deps += [ "//chrome/browser/default_browser" ]
      }
- 
-     if (is_win && is_chrome_branded) {
+   }
+ }
++
++if (is_win) {
++  # NBrowser GitHub Releases updater. Split out of :impl into its own
++  # source_set so that chrome/browser/ui/webui/help (which needs this for
++  # version_updater_win.cc) can depend on it directly without depending on
++  # all of :impl - which would create a dependency cycle, since :impl
++  # already depends on //chrome/browser/ui/webui/settings, which itself
++  # depends on //chrome/browser/ui/webui/help.
++  source_set("nbrowser_update") {
++    sources = [
++      "nbrowser_update_checker.cc",
++      "nbrowser_update_checker.h",
++      "nbrowser_update_infobar_delegate.cc",
++      "nbrowser_update_infobar_delegate.h",
++      "nbrowser_update_installer_launcher.cc",
++      "nbrowser_update_installer_launcher.h",
++      "nbrowser_update_prefs.h",
++      "nbrowser_update_prompt.cc",
++      "nbrowser_update_prompt.h",
++    ]
++    deps = [
++      "//chrome/app/vector_icons",
++      "//chrome/browser:browser_process",
++      "//chrome/browser/infobars",
++      "//chrome/browser/ui/webui/nbrowser_ui_strings:strings",
++      "//chrome/install_static:install_static_util",
++      "//chrome/installer/util:with_no_strings",
++      "//components/infobars/content",
++      "//components/infobars/core",
++      "//components/prefs",
++      "//components/vector_icons",
++      "//components/version_info",
++      "//content/public/browser",
++      "//services/data_decoder/public/cpp",
++      "//services/network/public/cpp",
++      "//ui/base",
++    ]
++  }
++}
 --- a/chrome/browser/ui/webui/settings/settings_ui.cc
 +++ b/chrome/browser/ui/webui/settings/settings_ui.cc
 @@ -52,6 +52,7 @@
@@ -93,10 +117,9 @@
  #include "chrome/browser/ui/toasts/toast_features.h"
  #include "chrome/browser/ui/ui_features.h"
  #include "chrome/browser/ui/views/side_panel/customize_chrome/customize_chrome_utils.h"
-@@ -656,6 +657,16 @@
+@@ -659,2 +659,18 @@
    html_source->AddBoolean("replaceSyncPromosWithSignInPromos",
                            syncer::IsReplaceSyncPromosWithSignInPromosEnabled());
- 
 +  // NBrowser GitHub Releases updater - drives the green dot next to "About
 +  // NBrowser" in the settings nav menu (settings_menu.ts/.html). Read once
 +  // per page load, same as the other booleans on this page; see
@@ -106,10 +129,13 @@
 +      g_browser_process->local_state()->GetBoolean(
 +          chrome::startup::nbrowser_update::prefs::
 +              kUpdateAvailableDotVisible));
-+
- #if BUILDFLAG(GOOGLE_CHROME_BRANDING) && !BUILDFLAG(IS_CHROMEOS)
-   // On Device AI setting.
-   // TODO(crbug.com/466442880): Grey out toggle based on device capability and
++  // Initial state for the auto-update toggle on chrome://settings/help -
++  // see about_page.ts.
++  html_source->AddBoolean(
++      "nbrowserUpdateAutoInstallEnabled",
++      g_browser_process->local_state()->GetBoolean(
++          chrome::startup::nbrowser_update::prefs::
++              kUpdateAutoInstallEnabled));
 --- a/chrome/browser/resources/settings/settings_menu/settings_menu.html
 +++ b/chrome/browser/resources/settings/settings_menu/settings_menu.html
 @@ -30,6 +30,17 @@
@@ -201,7 +227,7 @@
 +    # never sets that flag) and doesn't need aura/gfx/first_run/google.
 +    sources = [ "version_updater_win.cc" ]
 +    deps += [
-+      "//chrome/browser/ui/startup:impl",
++      "//chrome/browser/ui/startup:nbrowser_update",
 +      "//chrome/browser/ui/webui/nbrowser_ui_strings:strings",
 +      "//components/version_info",
 +      "//content/public/browser",
@@ -212,40 +238,146 @@
    if (is_linux) {
 --- a/chrome/browser/resources/settings/about_page/about_page.html.ts
 +++ b/chrome/browser/resources/settings/about_page/about_page.html.ts
-@@ -23,7 +23,13 @@
-   <div class="cr-row two-line">
-     <!-- Set the icon from the iconset (when it's obsolete/EOL and
+@@ -25,3 +25,3 @@
        when update is done) or set the src (when it's updating). -->
 -<if expr="False">
-+<!-- NBrowser: upstream ships this block behind expr="False" (permanently
-+     disabled at grit-preprocessing time) as of this Chromium version -
-+     re-enabled here with the same "not is_chromeos" gate the sibling
-+     Relaunch button below already uses, since NBrowser's GitHub Releases
-+     updater (chrome/browser/ui/webui/help/version_updater_win.cc) needs
-+     this block to actually display anything. -->
 +<if expr="not is_chromeos">
      <div class="icon-container"
-         ?hidden="${!this.shouldShowIcons_()}">
-       <cr-icon
-@@ -35,7 +41,8 @@
-     </div>
- </if>
+@@ -37,3 +37,3 @@
      <div class="flex cr-padded-text">
 -<if expr="False">
-+<!-- NBrowser: see the matching comment above the icon-container block. -->
 +<if expr="not is_chromeos">
        <div id="updateStatusMessage" ?hidden="${!this.showUpdateStatus_}">
-         <div role="alert" aria-live="polite"
-             .innerHTML="${this.getUpdateStatusMessage_()}">
+@@ -68,3 +68,16 @@
+ </if>
+   </div>
++<if expr="not is_chromeos">
++  <div id="nbrowserUpdateAutoInstall" class="cr-row"
++      ?hidden="${!this.showUpdateStatus_}">
++    <div class="flex cr-padded-text">
++      <div>$i18n{nbrowserUpdateAutoInstallToggleLabel}</div>
++      <div class="secondary">
++        $i18n{nbrowserUpdateAutoInstallToggleSubLabel}
++      </div>
++    </div>
++    <cr-toggle ?checked="${this.updateAutoInstallEnabled_}"
++        @change="${this.onUpdateAutoInstallToggleChange_}"></cr-toggle>
++  </div>
++</if>
+ <if expr="_google_chrome and is_macosx">
 --- a/chrome/browser/resources/settings/about_page/about_page.ts
 +++ b/chrome/browser/resources/settings/about_page/about_page.ts
-@@ -51,7 +51,8 @@
- export interface SettingsAboutPageElement {
-   $: {
-     productLogo: HTMLImageElement,
--    // <if expr="False">
-+    // NBrowser: re-enabled, see the matching comment in about_page.html.ts.
-+    // <if expr="not is_chromeos">
-     deprecationWarning: HTMLElement,
-     updateStatusMessage: HTMLElement,
-     // </if>
+@@ -18,1 +18,2 @@
+ import 'chrome://resources/cr_elements/cr_link_row/cr_link_row.js';
++import 'chrome://resources/cr_elements/cr_toggle/cr_toggle.js';
+@@ -94,1 +94,2 @@
+       showRelaunch_: {type: Boolean},
++      updateAutoInstallEnabled_: {type: Boolean},
+@@ -128,1 +128,3 @@
+   protected accessor showRelaunch_: boolean = false;
++  protected accessor updateAutoInstallEnabled_: boolean =
++      loadTimeData.getBoolean('nbrowserUpdateAutoInstallEnabled');
+@@ -244,1 +244,6 @@
+   }
++
++  protected onUpdateAutoInstallToggleChange_(e: CustomEvent<boolean>) {
++    this.updateAutoInstallEnabled_ = e.detail;
++    this.aboutBrowserProxy_.setUpdateAutoInstallEnabled(e.detail);
++  }
+--- a/chrome/browser/resources/settings/about_page/about_page_browser_proxy.ts
++++ b/chrome/browser/resources/settings/about_page/about_page_browser_proxy.ts
+@@ -57,4 +57,10 @@
+   refreshUpdateStatus(): void;
+ 
++  /**
++   * NBrowser GitHub Releases updater: sets whether updates install
++   * unattended (see nbrowser_update_prefs.h).
++   */
++  setUpdateAutoInstallEnabled(enabled: boolean): void;
++
+   /** Opens the help page. */
+   openHelpPage(): void;
+@@ -83,8 +83,12 @@
+   refreshUpdateStatus() {
+     chrome.send('refreshUpdateStatus');
+   }
+ 
++  setUpdateAutoInstallEnabled(enabled: boolean) {
++    chrome.send('setUpdateAutoInstallEnabled', [enabled]);
++  }
++
+   // <if expr="_google_chrome and is_macosx">
+   promoteUpdater() {
+     chrome.send('promoteUpdater');
+   }
+--- a/chrome/browser/ui/webui/settings/about_handler.h
++++ b/chrome/browser/ui/webui/settings/about_handler.h
+@@ -82,1 +82,5 @@
+   void HandleOpenHelpPage(const base::ListValue& args);
++
++  // NBrowser GitHub Releases updater - sets whether updates install
++  // unattended. See nbrowser_update_prefs.h.
++  void HandleSetUpdateAutoInstallEnabled(const base::ListValue& args);
+--- a/chrome/browser/ui/webui/settings/about_handler.cc
++++ b/chrome/browser/ui/webui/settings/about_handler.cc
+@@ -31,7 +31,8 @@
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+ #include "chrome/browser/ui/chrome_pages.h"
++#include "chrome/browser/ui/startup/nbrowser_update_prefs.h"
+ #include "chrome/browser/ui/webui/theme_source.h"
+ #include "chrome/browser/upgrade_detector/upgrade_detector.h"
+ #include "chrome/common/pref_names.h"
+@@ -41,7 +42,8 @@
+ #include "components/policy/core/common/management/management_service.h"
+ #include "components/policy/core/common/policy_namespace.h"
+ #include "components/policy/policy_constants.h"
++#include "components/prefs/pref_service.h"
+ #include "components/services/app_service/public/cpp/app_launch_util.h"
+ #include "components/strings/grit/components_strings.h"
+ #include "content/public/browser/browser_thread.h"
+ #include "content/public/browser/web_contents.h"
+@@ -314,6 +316,10 @@
+   web_ui()->RegisterMessageCallback(
+       "openHelpPage", base::BindRepeating(&AboutHandler::HandleOpenHelpPage,
+                                           base::Unretained(this)));
++  web_ui()->RegisterMessageCallback(
++      "setUpdateAutoInstallEnabled",
++      base::BindRepeating(&AboutHandler::HandleSetUpdateAutoInstallEnabled,
++                          base::Unretained(this)));
+ #if BUILDFLAG(IS_CHROMEOS)
+   web_ui()->RegisterMessageCallback(
+       "openDiagnostics",
+@@ -526,7 +532,19 @@
+           web_ui()->GetWebContents());
+   chrome::ShowHelp(browser, chrome::HelpSource::kWebUI);
+ }
+ 
++void AboutHandler::HandleSetUpdateAutoInstallEnabled(
++    const base::ListValue& args) {
++  CHECK_EQ(1U, args.size());
++  if (!args[0].is_bool()) {
++    LOG(ERROR) << "Can't parse setUpdateAutoInstallEnabled() args";
++    return;
++  }
++  g_browser_process->local_state()->SetBoolean(
++      chrome::startup::nbrowser_update::prefs::kUpdateAutoInstallEnabled,
++      args[0].GetBool());
++}
++
+ #if BUILDFLAG(IS_CHROMEOS)
+ void AboutHandler::HandleOpenDiagnostics(const base::ListValue& args) {
+   DCHECK(args.empty());
+--- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
++++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+@@ -311,5 +311,9 @@
+   static constexpr webui::LocalizedString kLocalizedStrings[] = {
+       {"aboutProductLogoAlt", IDS_SHORT_PRODUCT_LOGO_ALT_TEXT},
++      {"nbrowserUpdateAutoInstallToggleLabel",
++       IDS_NBROWSER_UPDATE_AUTO_INSTALL_TOGGLE_LABEL},
++      {"nbrowserUpdateAutoInstallToggleSubLabel",
++       IDS_NBROWSER_UPDATE_AUTO_INSTALL_TOGGLE_SUB_LABEL},
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+       {"aboutReportAnIssue", IDS_SETTINGS_ABOUT_PAGE_REPORT_AN_ISSUE},
+       {"aboutPrivacyPolicy", IDS_SETTINGS_ABOUT_PAGE_PRIVACY_POLICY},

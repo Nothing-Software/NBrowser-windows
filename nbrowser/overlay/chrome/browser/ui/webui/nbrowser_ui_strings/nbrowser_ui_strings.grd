@@ -153,6 +153,15 @@
       <message name="IDS_NBROWSER_UPDATE_INSTALLER_LAUNCH_FAILED" desc="Status message on chrome://settings/help when downloading or launching the update installer fails.">
         Couldn't download the update. Try again later.
       </message>
+      <message name="IDS_NBROWSER_UPDATE_AVAILABLE_ABOUT_PAGE_TEXT" desc="Status message on chrome://settings/help when a newer version was found but 'auto-update' is off, so nothing was downloaded automatically - points the user at the infobar that was just shown instead.">
+        A new version of NBrowser is available. Look for the notification at the top of the window to install it.
+      </message>
+      <message name="IDS_NBROWSER_UPDATE_AUTO_INSTALL_TOGGLE_LABEL" desc="Label for the toggle on chrome://settings/help that controls whether NBrowser installs updates automatically or asks first.">
+        Allow NBrowser to update automatically
+      </message>
+      <message name="IDS_NBROWSER_UPDATE_AUTO_INSTALL_TOGGLE_SUB_LABEL" desc="Sub-label under the auto-update toggle on chrome://settings/help, explaining what turning it off does.">
+        When off, you'll be asked before each update is installed.
+      </message>
     </messages>
   </release>
 </grit>

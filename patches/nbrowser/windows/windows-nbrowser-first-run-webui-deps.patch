@@ -12,13 +12,14 @@
      "//chrome/browser/ui",
      "//chrome/browser/ui/webui/about",
      "//chrome/browser/ui/webui/accessibility",
-@@ -97,8 +101,13 @@ source_set("configs") {
+@@ -102,9 +106,14 @@ source_set("configs") {
      "//chrome/browser/ui/webui/usb_internals",
      "//chrome/browser/ui/webui/version",
      "//components/compose:buildflags",
 +    "//components/language/core/browser",
      "//components/lens:buildflags",
 +    "//components/live_caption:constants",
+     "//components/notebooks/internals/webui",
 +    "//components/search_engines",
      "//components/security_interstitials/content:security_interstitial_page",
 +    "//components/spellcheck/browser",

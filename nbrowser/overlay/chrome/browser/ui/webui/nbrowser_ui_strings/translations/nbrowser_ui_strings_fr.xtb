@@ -3,12 +3,15 @@
 <translationbundle lang="fr">
 <translation id="259939095371044506">Couleur secondaire</translation>
 <translation id="473775607612524610">Mettre à jour</translation>
+<translation id="1146903979901528862">Si désactivé, vous serez invité(e) avant l'installation de chaque mise à jour.</translation>
 <translation id="1684279041537802716">Couleur d'accentuation</translation>
 <translation id="2707021329343209294">Couleur enregistrée</translation>
 <translation id="3391031795074996627">Impossible de télécharger la mise à jour. Réessayez plus tard.</translation>
 <translation id="3460332313611173557">Saisissez une couleur hexadécimale valide, par exemple #000000</translation>
+<translation id="3806969146385418392">Autoriser NBrowser à se mettre à jour automatiquement</translation>
 <translation id="4277430129575371624">Couleur principale</translation>
 <translation id="5558616452704772882">Couleurs personnalisées</translation>
+<translation id="5949853856690357931">Une nouvelle version de NBrowser est disponible. Recherchez la notification en haut de la fenêtre pour l'installer.</translation>
 <translation id="7233421021020136469">Supprimer la couleur enregistrée</translation>
 <translation id="8501436326098077818">Une nouvelle version de NBrowser est disponible.</translation>
 <translation id="8835511040431265190">Enregistrer le préréglage</translation>

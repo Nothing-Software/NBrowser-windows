@@ -1,3 +1,15 @@
+// Copyright 2026 The Nothing Software Authors
+// Use of this source code is governed by a BSD-style license
+//
+// NBrowser: this file fully replaces ungoogled-chromium's own
+// ungoogled_first_run.h - same filename and WebUIConfig registration in
+// chrome_web_ui_configs.cc (stock ungoogled-chromium code, not patched by
+// NBrowser) so this content slots into that existing plumbing without
+// needing to touch chrome_web_ui_configs.cc at all. Renaming this file
+// would trade that zero-patch-footprint trick for a brand new patch on a
+// file NBrowser otherwise never has to touch - not worth it for a cosmetic
+// naming fix alone.
+
 #ifndef CHROME_BROWSER_UI_WEBUI_UNGOOGLED_FIRST_RUN_H_
 #define CHROME_BROWSER_UI_WEBUI_UNGOOGLED_FIRST_RUN_H_
 

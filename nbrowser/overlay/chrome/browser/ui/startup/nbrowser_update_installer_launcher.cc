@@ -1,6 +1,5 @@
-// Copyright 2026 The NBrowser Authors
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// Copyright 2026 The Nothing Software Authors
+// Use of this source code is governed by a BSD-style license
 
 #include "chrome/browser/ui/startup/nbrowser_update_installer_launcher.h"
 
@@ -48,7 +47,7 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
           }
           internal {
             contacts {
-              email: "dev@nothing-software.example"
+              email: "contact@aerlab.net"
             }
           }
           last_reviewed: "2026-08-28"
