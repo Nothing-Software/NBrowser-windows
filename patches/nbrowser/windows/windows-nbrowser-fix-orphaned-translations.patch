@@ -6695,7 +6695,7 @@ index 0e09f25173..3e06391f03 100644
  </translationbundle>
 \ No newline at end of file
 diff --git a/chrome/app/resources/generated_resources_de.xtb b/chrome/app/resources/generated_resources_de.xtb
-index f630847b47..f1f6707cd3 100644
+index f630847b47..27188bbd57 100644
 --- a/chrome/app/resources/generated_resources_de.xtb
 +++ b/chrome/app/resources/generated_resources_de.xtb
 @@ -1,6 +1,8 @@
@@ -6770,6 +6770,15 @@ index f630847b47..f1f6707cd3 100644
  <translation id="4923561999941435531">{0,plural, =1{1 Element im Konto speichern}other{# Elemente im Konto speichern}}</translation>
  <translation id="4923977675318667854">Tabgruppen anzeigen</translation>
  <translation id="4924002401726507608">Feedback geben</translation>
+@@ -6352,7 +6354,7 @@ Du kannst dieser Aktion mehrere Schalter zuweisen.</translation>
+ <translation id="5906974869830879618">Bitte gib eine PIN ein</translation>
+ <translation id="5908474332780919512">App beim Anmelden starten</translation>
+ <translation id="5910363049092958439">Bi&amp;ld speichern unter...</translation>
+-<translation id="5911030830365207728">Google Übersetzer</translation>
++<translation id="5911030830365207728">Übersetzer</translation>
+ <translation id="5911497236110691522">Wenn du zur nächsten Eingabemethode wechseln möchtest, drücke <ph name="KEY_CODES" /></translation>
+ <translation id="5911545422157959623">Lesezeichen sind im Gastmodus nicht verfügbar</translation>
+ <translation id="5914016309240354769">Natur</translation>
 @@ -7325,7 +7327,7 @@ Du hast # weitere kompromittierte Passwörter. Der Google Passwortmanager empfi
  <translation id="6677527809400770913">Geste „<ph name="GESTURE" />“ wurde Aktion „<ph name="ACTION" />“ zugewiesen</translation>
  <translation id="6678604587151240716">Große Wellen erheben sich aus dem Meer, fernab im Hintergrund ist Land zu sehen. Der Himmel ist düster, nur am Horizont sind orangefarbene Lichtreflektionen zu sehen.</translation>
@@ -6789,7 +6798,7 @@ index f630847b47..f1f6707cd3 100644
  <translation id="8690129572193755009">Websites dürfen nachfragen, wenn sie Protokolle verarbeiten möchten</translation>
  <translation id="869144235543261764">Auf diesem Tab wird ein Video im Bild-im-Bild-Modus abgespielt</translation>
 diff --git a/chrome/app/resources/generated_resources_es.xtb b/chrome/app/resources/generated_resources_es.xtb
-index 6eb2b0b168..fbb2eaaf5a 100644
+index 6eb2b0b168..3b662690b8 100644
 --- a/chrome/app/resources/generated_resources_es.xtb
 +++ b/chrome/app/resources/generated_resources_es.xtb
 @@ -1,6 +1,8 @@
@@ -6864,6 +6873,15 @@ index 6eb2b0b168..fbb2eaaf5a 100644
  <translation id="4923561999941435531">{0,plural, =1{Guardar 1 elemento en la cuenta}other{Guardar # elementos en la cuenta}}</translation>
  <translation id="4923977675318667854">Mostrar grupos de pestañas</translation>
  <translation id="4924002401726507608">Enviar comentarios</translation>
+@@ -6356,7 +6358,7 @@ Puedes asignar esta acción a varios interruptores.</translation>
+ <translation id="5906974869830879618">Introduce un PIN</translation>
+ <translation id="5908474332780919512">Abrir aplicación al iniciar sesión</translation>
+ <translation id="5910363049092958439">Guar&amp;dar imagen como...</translation>
+-<translation id="5911030830365207728">Traductor de Google</translation>
++<translation id="5911030830365207728">Traductor</translation>
+ <translation id="5911497236110691522">Para cambiar al siguiente método de introducción de texto, pulsa <ph name="KEY_CODES" /></translation>
+ <translation id="5911545422157959623">Los marcadores no están disponibles en el modo Invitado</translation>
+ <translation id="5914016309240354769">Naturaleza</translation>
 @@ -7330,7 +7332,7 @@ Tienes # contraseñas vulneradas más. El Gestor de contraseñas de Google te re
  <translation id="6677527809400770913">Gesto "<ph name="GESTURE" />" asignado a "<ph name="ACTION" />"</translation>
  <translation id="6678604587151240716">Grandes olas rompiendo en el mar, con tierra de fondo. Destellos anaranjados más allá del horizonte, en un cielo oscuro y melancólico.</translation>
@@ -6883,7 +6901,7 @@ index 6eb2b0b168..fbb2eaaf5a 100644
  <translation id="8690129572193755009">Los sitios pueden solicitar permiso para procesar protocolos</translation>
  <translation id="869144235543261764">Esta pestaña está reproduciendo un vídeo en modo Imagen en imagen</translation>
 diff --git a/chrome/app/resources/generated_resources_fr.xtb b/chrome/app/resources/generated_resources_fr.xtb
-index 8d4b64d933..2a228b4681 100644
+index 8d4b64d933..76dcc331a8 100644
 --- a/chrome/app/resources/generated_resources_fr.xtb
 +++ b/chrome/app/resources/generated_resources_fr.xtb
 @@ -1,6 +1,8 @@
@@ -6958,6 +6976,15 @@ index 8d4b64d933..2a228b4681 100644
  <translation id="4923561999941435531">{0,plural, =1{Enregistrer 1 élément dans le compte}one{Enregistrer # élément dans le compte}other{Enregistrer # éléments dans le compte}}</translation>
  <translation id="4923977675318667854">Afficher les groupes d'onglets</translation>
  <translation id="4924002401726507608">Envoyer des commentaires</translation>
+@@ -6355,7 +6357,7 @@ Assurez-vous de ne pas dévoiler d'informations sensibles.</translation>
+ <translation id="5906974869830879618">Veuillez saisir un code</translation>
+ <translation id="5908474332780919512">Lancer l'application lors de la connexion</translation>
+ <translation id="5910363049092958439">En&amp;registrer l'image sous...</translation>
+-<translation id="5911030830365207728">Google Traduction</translation>
++<translation id="5911030830365207728">Traduction</translation>
+ <translation id="5911497236110691522">Pour passer au mode de saisie suivant, appuyez sur <ph name="KEY_CODES" /></translation>
+ <translation id="5911545422157959623">Les favoris ne sont pas disponibles en mode Invité</translation>
+ <translation id="5914016309240354769">Nature</translation>
 @@ -7331,7 +7333,7 @@ Vous avez # autres mots de passe compromis. Le Gestionnaire de mots de passe Go
  <translation id="6677527809400770913">Geste <ph name="GESTURE" /> attribué à <ph name="ACTION" /></translation>
  <translation id="6678604587151240716">Grandes vagues produisant de l'écume, avec la terre en arrière-plan. Des lueurs orangées apparaissent à l'horizon, dans un ciel sombre et menaçant.</translation>
@@ -7089,7 +7116,7 @@ index bf832ea253..c5e4d75a3f 100644
  <translation id="8690129572193755009">Разрешить сайтам отправлять запрос на обработку протоколов</translation>
  <translation id="869144235543261764">На этой вкладке воспроизводится видео в режиме "Картинка в картинке"</translation>
 diff --git a/chrome/app/resources/generated_resources_zh-CN.xtb b/chrome/app/resources/generated_resources_zh-CN.xtb
-index e9e5b8dc9b..a58148d30b 100644
+index e9e5b8dc9b..653d2b3b1e 100644
 --- a/chrome/app/resources/generated_resources_zh-CN.xtb
 +++ b/chrome/app/resources/generated_resources_zh-CN.xtb
 @@ -1,6 +1,8 @@
@@ -7164,6 +7191,15 @@ index e9e5b8dc9b..a58148d30b 100644
  <translation id="4923561999941435531">{0,plural, =1{将 1 项内容保存在账号中}other{将 # 项内容保存在账号中}}</translation>
  <translation id="4923977675318667854">显示标签页分组</translation>
  <translation id="4924002401726507608">提交反馈</translation>
+@@ -6351,7 +6353,7 @@
+ <translation id="5906974869830879618">请输入 PIN 码</translation>
+ <translation id="5908474332780919512">在您登录时启动应用</translation>
+ <translation id="5910363049092958439">图片存储为(&amp;V)...</translation>
+-<translation id="5911030830365207728">Google 翻译</translation>
++<translation id="5911030830365207728">翻译</translation>
+ <translation id="5911497236110691522">若要切换到下一种输入法，请按 <ph name="KEY_CODES" /></translation>
+ <translation id="5911545422157959623">在访客模式下无法使用书签</translation>
+ <translation id="5914016309240354769">自然</translation>
 @@ -7324,7 +7326,7 @@
  <translation id="6677527809400770913">已将手势“<ph name="GESTURE" />”分配给“<ph name="ACTION" />”</translation>
  <translation id="6678604587151240716">海中巨浪翻滚，远处背景是一片陆地。天空暗沉，地平线上隐约透出橙色光芒。</translation>

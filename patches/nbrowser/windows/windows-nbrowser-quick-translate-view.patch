@@ -24,10 +24,10 @@ index 8fadd09087..dbdbbfc4e5 100644
      "//components/lens:features",
 diff --git a/chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.cc b/chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.cc
 new file mode 100644
-index 0000000000..f6d4cd25e6
+index 0000000000..c48098e7d5
 --- /dev/null
 +++ b/chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.cc
-@@ -0,0 +1,141 @@
+@@ -0,0 +1,161 @@
 +// Copyright 2026 The NBrowser Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -46,6 +46,7 @@ index 0000000000..f6d4cd25e6
 +#include "ui/gfx/text_constants.h"
 +#include "ui/views/controls/label.h"
 +#include "ui/views/controls/menu/menu_config.h"
++#include "ui/views/controls/throbber.h"
 +#include "ui/views/layout/box_layout.h"
 +
 +namespace quick_translate {
@@ -82,6 +83,19 @@ index 0000000000..f6d4cd25e6
 +      gfx::Insets::VH(kVerticalPadding, kHorizontalPadding),
 +      kBetweenLabelSpacing));
 +
++  // views::BoxLayout applies one cross-axis alignment to every direct
++  // child, and the labels below need CrossAxisAlignment::kStretch (the
++  // default) so their real width is known and multi-line wrapping works.
++  // Wrapping the throbber in its own row keeps it at its natural 16x16
++  // size, left-aligned, instead of being stretched into a flattened oval
++  // across the whole menu width.
++  auto throbber_row = std::make_unique<views::View>();
++  throbber_row->SetLayoutManager(
++      std::make_unique<views::BoxLayout>(views::BoxLayout::Orientation::kHorizontal));
++  throbber_ = throbber_row->AddChildView(std::make_unique<views::Throbber>());
++  throbber_->Start();
++  throbber_row_ = AddChildView(std::move(throbber_row));
++
 +  // Smaller, muted "SourceLang -> TargetLang" line above the prominent
 +  // translated text - the same visual hierarchy as a subtitle under a title.
 +  language_pair_label_ = AddChildView(
@@ -90,8 +104,7 @@ index 0000000000..f6d4cd25e6
 +
 +  text_label_ = AddChildView(
 +      CreateRowLabel(ui::kColorMenuItemForeground, /*font_size_delta=*/0));
-+  text_label_->SetText(
-+      l10n_util::GetStringUTF16(IDS_QUICK_TRANSLATE_MENU_ITEM));
++  text_label_->SetVisible(false);
 +}
 +
 +QuickTranslateMenuView::~QuickTranslateMenuView() = default;
@@ -101,6 +114,9 @@ index 0000000000..f6d4cd25e6
 +  using Status = QuickTranslateProvider::Status;
 +  const std::string app_locale = g_browser_process->GetApplicationLocale();
 +
++  throbber_->Stop();
++  throbber_row_->SetVisible(false);
++  text_label_->SetVisible(true);
 +  language_pair_label_->SetVisible(result.status == Status::kOk);
 +
 +  switch (result.status) {
@@ -129,6 +145,10 @@ index 0000000000..f6d4cd25e6
 +    case Status::kNotReady:
 +      text_label_->SetText(
 +          l10n_util::GetStringUTF16(IDS_QUICK_TRANSLATE_PREPARING));
++      break;
++    case Status::kNoConnection:
++      text_label_->SetText(
++          l10n_util::GetStringUTF16(IDS_QUICK_TRANSLATE_NO_CONNECTION));
 +      break;
 +    case Status::kError:
 +      text_label_->SetText(
@@ -171,10 +191,10 @@ index 0000000000..f6d4cd25e6
 +}  // namespace quick_translate
 diff --git a/chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.h b/chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.h
 new file mode 100644
-index 0000000000..5c4e3da78d
+index 0000000000..14847c7bfe
 --- /dev/null
 +++ b/chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.h
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,62 @@
 +// Copyright 2026 The NBrowser Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -190,6 +210,7 @@ index 0000000000..5c4e3da78d
 +
 +namespace views {
 +class Label;
++class Throbber;
 +}  // namespace views
 +
 +namespace quick_translate {
@@ -222,6 +243,12 @@ index 0000000000..5c4e3da78d
 +      const views::SizeBounds& available_size) const override;
 +
 + private:
++  // Wraps `throbber_` in its own row so the outer BoxLayout's cross-axis
++  // stretch (needed for the multi-line labels below to wrap against the
++  // menu's real width) doesn't also stretch the throbber itself into a
++  // flattened oval - see the .cc constructor for details.
++  raw_ptr<views::View> throbber_row_ = nullptr;
++  raw_ptr<views::Throbber> throbber_ = nullptr;
 +  raw_ptr<views::Label> language_pair_label_ = nullptr;
 +  raw_ptr<views::Label> text_label_ = nullptr;
 +  base::WeakPtrFactory<QuickTranslateMenuView> weak_ptr_factory_{this};
@@ -231,7 +258,7 @@ index 0000000000..5c4e3da78d
 +
 +#endif  // CHROME_BROWSER_UI_VIEWS_RENDERER_CONTEXT_MENU_QUICK_TRANSLATE_MENU_VIEW_H_
 diff --git a/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.cc b/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.cc
-index d38a53955f..47894a1c7d 100644
+index d38a53955f..417265a41c 100644
 --- a/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.cc
 +++ b/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.cc
 @@ -7,13 +7,16 @@
@@ -294,7 +321,7 @@ index d38a53955f..47894a1c7d 100644
    // Enable recursive tasks on the message loop so we can get updates while
    // the context menu is being displayed.
    base::CurrentThread::ScopedAllowApplicationTasksInNativeNestedLoop allow;
-@@ -429,6 +468,40 @@ void RenderViewContextMenuViews::Show() {
+@@ -429,6 +468,36 @@ void RenderViewContextMenuViews::Show() {
    }
  }
  
@@ -303,10 +330,6 @@ index d38a53955f..47894a1c7d 100644
 +      static_cast<ToolkitDelegateViews*>(toolkit_delegate())
 +          ->menu_view()
 +          ->GetMenuItemByID(kQuickTranslateMenuId);
-+  LOG(WARNING) << "QuickTranslate: RefreshQuickTranslateView, item="
-+              << quick_translate_item
-+              << " has_view=" << !!quick_translate_menu_view_
-+              << " has_result=" << quick_translate_result_.has_value();
 +  if (!quick_translate_item) {
 +    return;
 +  }

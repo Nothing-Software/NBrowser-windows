@@ -24,7 +24,7 @@ diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn
      "//chrome/browser/profiles:profile_util",
      "//chrome/browser/push_messaging",
      "//chrome/browser/push_messaging:service_impl_public",
-+    "//chrome/browser/quick_translate",
++    "//chrome/browser/quick_translate:prefs",
      "//chrome/browser/search",
      "//chrome/browser/search/background",
      "//chrome/browser/serial",
@@ -67,3 +67,36 @@ index 47ee2c73fc..44cf5d92bd 100644
  <cr-collapse opened="[[prefs.translate.enabled.value]]">
    <div class="cr-row continuation">
      <div id="targetLanguageLabel" class="flex cr-padded-text"
+diff --git a/chrome/browser/extensions/BUILD.gn b/chrome/browser/extensions/BUILD.gn
+--- a/chrome/browser/extensions/BUILD.gn
++++ b/chrome/browser/extensions/BUILD.gn
+@@ -533,6 +531,7 @@ source_set("extensions") {
+     "//chrome/browser/profiles:profile",
+     "//chrome/browser/profiles:profile_manager",
+     "//chrome/browser/profiles/keep_alive",
++    "//chrome/browser/quick_translate:prefs",
+     "//chrome/browser/renderer_host",
+     "//chrome/browser/resource_coordinator:utils",
+     "//chrome/browser/resources:component_extension_resources",
+diff --git a/chrome/browser/extensions/api/settings_private/prefs_util.cc b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+--- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
++++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+@@ -28,6 +28,7 @@
+ #include "chrome/browser/password_manager/generated_password_leak_detection_pref.h"
+ #include "chrome/browser/prefs/session_startup_pref.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/quick_translate/quick_translate_prefs.h"
+ #include "chrome/browser/safe_browsing/generated_safe_browsing_pref.h"
+ #include "chrome/browser/safe_browsing/generated_security_settings_bundle_pref.h"
+ #include "chrome/browser/ssl/generated_https_first_mode_pref.h"
+@@ -509,6 +494,10 @@ const PrefsUtil::TypedPrefMap& PrefsUtil::GetAllowlistedKeys() {
+       settings_api::PrefType::kBoolean;
+   (*s_allowlist)[translate::prefs::kOfferTranslateEnabled] =
+       settings_api::PrefType::kBoolean;
++  (*s_allowlist)[quick_translate::prefs::kQuickTranslateEnabled] =
++      settings_api::PrefType::kBoolean;
++  (*s_allowlist)[quick_translate::prefs::kQuickTranslateUseOnlineModel] =
++      settings_api::PrefType::kBoolean;
+   (*s_allowlist)[translate::prefs::kBlockedLanguages] =
+       settings_api::PrefType::kList;
+   (*s_allowlist)[translate::prefs::kPrefNeverPromptSitesWithTime] =
