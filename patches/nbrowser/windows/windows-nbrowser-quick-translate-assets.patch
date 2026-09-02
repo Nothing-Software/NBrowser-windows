@@ -1,0 +1,131 @@
+diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
+--- a/chrome/BUILD.gn
++++ b/chrome/BUILD.gn
+@@ -333,10 +333,11 @@ if (!is_android && !is_mac) {
+     if (is_chromeos && !is_component_build) {
+       configs += [ "//build/config/gcc:rpath_for_built_shared_libraries" ]
+     }
+
+     data_deps += [
+       "//chrome/browser/web_applications/isolated_web_apps/key_distribution/preload:component",
++      "//nbrowser_translatekit",
+       "//third_party/widevine/cdm",
+     ]
+
+     if (is_linux) {
+diff --git a/chrome/installer/mini_installer/chrome.release b/chrome/installer/mini_installer/chrome.release
+--- a/chrome/installer/mini_installer/chrome.release
++++ b/chrome/installer/mini_installer/chrome.release
+@@ -106,6 +106,19 @@ WidevineCdm\_platform_specific\win_x64\widevinecdm.dll.sig: %(VersionDir)s\Widev
+ WidevineCdm\_platform_specific\win_arm64\widevinecdm.dll: %(VersionDir)s\WidevineCdm\_platform_specific\win_arm64\
+ WidevineCdm\_platform_specific\win_arm64\widevinecdm.dll.sig: %(VersionDir)s\WidevineCdm\_platform_specific\win_arm64\
+
++#
++# NBrowser: Quick Translate's vendored on-device TranslateKit engine + en-ru
++# language pack (see //nbrowser_translatekit and
++# chrome/browser/quick_translate/) - bundled the same way as WidevineCdm
++# above, since ungoogled-chromium's block-requests.patch disables the normal
++# component-updater download for this too.
++#
++TranslateKitFiles\libtranslatekit.dll: %(VersionDir)s\TranslateKitFiles\
++TranslateKitFiles\LanguagePacks\en_ru\en_ru_dictionary\*.*: %(VersionDir)s\TranslateKitFiles\LanguagePacks\en_ru\en_ru_dictionary\
++TranslateKitFiles\LanguagePacks\en_ru\en_ru_nmt\*.*: %(VersionDir)s\TranslateKitFiles\LanguagePacks\en_ru\en_ru_nmt\
++TranslateKitFiles\LanguagePacks\en_ru\ru_en_nmt\*.*: %(VersionDir)s\TranslateKitFiles\LanguagePacks\en_ru\ru_en_nmt\
++LanguageDetectionModel\model.tflite: %(VersionDir)s\LanguageDetectionModel\
++
+ [SNAPSHOTBLOB]
+ # The snapshot_blob.bin V8 snapshot is needed in builds that don't use
+ # v8_context_snapshot.bin, such as Linux-Windows cross-builds.
+diff --git a/nbrowser_translatekit/BUILD.gn b/nbrowser_translatekit/BUILD.gn
+new file mode 100644
+index 0000000000..1159ef0cff
+--- /dev/null
++++ b/nbrowser_translatekit/BUILD.gn
+@@ -0,0 +1,87 @@
++# Copyright 2026 The NBrowser Authors
++# Use of this source code is governed by a BSD-style license that can be
++# found in the LICENSE file.
++
++# Vendors the on-device TranslateKit engine + en<->ru language pack for the
++# Quick Translate feature (chrome/browser/quick_translate/), bundled directly
++# into the build instead of relying on component updater - which
++# ungoogled-chromium's block-requests.patch disables unconditionally, so
++# these files would otherwise never download on their own. Mirrors the
++# pattern used by //third_party/widevine/cdm for the same class of problem
++# (a vendored binary that needs to land next to chrome.exe and ship inside
++# the installer).
++#
++# Source layout under this directory mirrors the real, installed
++# component-updater layout on a stock Chrome (minus per-component metadata
++# files that aren't needed at runtime):
++#   TranslateKit/lib/<version>/TranslateKitFiles/libtranslatekit.dll
++#   TranslateKit/models/en_ru/<version>/{en_ru_dictionary,en_ru_nmt,ru_en_nmt}/...
++# Component ids (for reference, computed from the public key hashes embedded
++# in components/on_device_translation/public/language_pack.h and
++# components/on_device_translation/constants.h):
++#   engine:  lbimbicckdokpoicboneldipejkhjgdg
++#   en-ru language pack: dbognndpjnignbdnlokipljnjdbcnfmc
++
++copy("language_detection_model") {
++  # Bundled the same way and for the same reason as TranslateKit above: local
++  # language detection (components/language_detection) needs a model file
++  # delivered via Optimization Guide's own download pipeline (a different,
++  # Google-API-key-gated mechanism, unrelated to component updater), which
++  # never completes in this fork. Fed to the browser via the
++  # --optimization-guide-model-override flag (see chrome_main_delegate.cc),
++  # which - unlike TranslateKit - is an existing, real upstream escape hatch
++  # for exactly this ("point this optimization target at a local file")
++  # rather than something added for this feature.
++  sources = [ "LanguageDetectionModel/model.tflite" ]
++  outputs = [ "$root_out_dir/LanguageDetectionModel/{{source_file_part}}" ]
++}
++
++copy("translatekit_binary") {
++  sources = [ "TranslateKitFiles/libtranslatekit.dll" ]
++  outputs = [ "$root_out_dir/TranslateKitFiles/{{source_file_part}}" ]
++}
++
++copy("translatekit_en_ru_dictionary") {
++  sources = [ "TranslateKitFiles/LanguagePacks/en_ru/en_ru_dictionary/dictionary.bin" ]
++  outputs = [ "$root_out_dir/TranslateKitFiles/LanguagePacks/en_ru/en_ru_dictionary/{{source_file_part}}" ]
++}
++
++copy("translatekit_en_ru_nmt") {
++  sources = [
++    "TranslateKitFiles/LanguagePacks/en_ru/en_ru_nmt/decoder_init_0.tflite",
++    "TranslateKitFiles/LanguagePacks/en_ru/en_ru_nmt/decoder_step_0.tflite",
++    "TranslateKitFiles/LanguagePacks/en_ru/en_ru_nmt/encoder_0.tflite",
++    "TranslateKitFiles/LanguagePacks/en_ru/en_ru_nmt/processor_spec.pb",
++    "TranslateKitFiles/LanguagePacks/en_ru/en_ru_nmt/src_spm_model.model",
++    "TranslateKitFiles/LanguagePacks/en_ru/en_ru_nmt/src_spm_model.vocab",
++    "TranslateKitFiles/LanguagePacks/en_ru/en_ru_nmt/tgt_spm_model.model",
++    "TranslateKitFiles/LanguagePacks/en_ru/en_ru_nmt/tgt_spm_model.vocab",
++    "TranslateKitFiles/LanguagePacks/en_ru/en_ru_nmt/translation_model.pb",
++  ]
++  outputs = [ "$root_out_dir/TranslateKitFiles/LanguagePacks/en_ru/en_ru_nmt/{{source_file_part}}" ]
++}
++
++copy("translatekit_ru_en_nmt") {
++  sources = [
++    "TranslateKitFiles/LanguagePacks/en_ru/ru_en_nmt/decoder_init_0.tflite",
++    "TranslateKitFiles/LanguagePacks/en_ru/ru_en_nmt/decoder_step_0.tflite",
++    "TranslateKitFiles/LanguagePacks/en_ru/ru_en_nmt/encoder_0.tflite",
++    "TranslateKitFiles/LanguagePacks/en_ru/ru_en_nmt/processor_spec.pb",
++    "TranslateKitFiles/LanguagePacks/en_ru/ru_en_nmt/src_spm_model.model",
++    "TranslateKitFiles/LanguagePacks/en_ru/ru_en_nmt/src_spm_model.vocab",
++    "TranslateKitFiles/LanguagePacks/en_ru/ru_en_nmt/tgt_spm_model.model",
++    "TranslateKitFiles/LanguagePacks/en_ru/ru_en_nmt/tgt_spm_model.vocab",
++    "TranslateKitFiles/LanguagePacks/en_ru/ru_en_nmt/translation_model.pb",
++  ]
++  outputs = [ "$root_out_dir/TranslateKitFiles/LanguagePacks/en_ru/ru_en_nmt/{{source_file_part}}" ]
++}
++
++group("nbrowser_translatekit") {
++  data_deps = [
++    ":language_detection_model",
++    ":translatekit_binary",
++    ":translatekit_en_ru_dictionary",
++    ":translatekit_en_ru_nmt",
++    ":translatekit_ru_en_nmt",
++  ]
++}

@@ -1,0 +1,455 @@
+diff --git a/chrome/browser/ui/views/renderer_context_menu/BUILD.gn b/chrome/browser/ui/views/renderer_context_menu/BUILD.gn
+index 8fadd09087..dbdbbfc4e5 100644
+--- a/chrome/browser/ui/views/renderer_context_menu/BUILD.gn
++++ b/chrome/browser/ui/views/renderer_context_menu/BUILD.gn
+@@ -18,12 +18,18 @@ source_set("renderer_context_menu") {
+ }
+ 
+ source_set("impl") {
+-  sources = [ "render_view_context_menu_views.cc" ]
++  sources = [
++    "quick_translate_menu_view.cc",
++    "quick_translate_menu_view.h",
++    "render_view_context_menu_views.cc",
++  ]
+ 
+   deps = [
+     ":renderer_context_menu",
+     "//chrome/app:command_ids",
++    "//chrome/browser/quick_translate",
+     "//chrome/browser/ui/views/side_panel",
++    "//chrome/browser/ui/webui/nbrowser_ui_strings:strings",
+     "//chrome/common:non_code_constants",
+     "//components/lens:buildflags",
+     "//components/lens:features",
+diff --git a/chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.cc b/chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.cc
+new file mode 100644
+index 0000000000..f6d4cd25e6
+--- /dev/null
++++ b/chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.cc
+@@ -0,0 +1,141 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.h"
++
++#include <memory>
++#include <utility>
++
++#include "chrome/browser/browser_process.h"
++#include "chrome/browser/ui/webui/nbrowser_ui_strings/grit/nbrowser_ui_strings.h"
++#include "ui/base/l10n/l10n_util.h"
++#include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/color/color_id.h"
++#include "ui/gfx/geometry/insets.h"
++#include "ui/gfx/text_constants.h"
++#include "ui/views/controls/label.h"
++#include "ui/views/controls/menu/menu_config.h"
++#include "ui/views/layout/box_layout.h"
++
++namespace quick_translate {
++
++namespace {
++
++constexpr int kHorizontalPadding = 14;
++constexpr int kVerticalPadding = 8;
++constexpr int kBetweenLabelSpacing = 3;
++
++// A deliberately narrow width used only to compute this view's preferred
++// HEIGHT (see CalculatePreferredSize() below) - the row still visually
++// stretches to whatever the menu's real width ends up being via
++// set_children_use_full_width(true) in render_view_context_menu_views.cc.
++constexpr int kFixedWidthForHeightCalc = 240;
++
++std::unique_ptr<views::Label> CreateRowLabel(ui::ColorId color,
++                                             int font_size_delta) {
++  auto label = std::make_unique<views::Label>();
++  label->SetAutoColorReadabilityEnabled(false);
++  label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
++  label->SetMultiLine(true);
++  label->SetEnabledColor(color);
++  label->SetFontList(views::MenuConfig::instance().font_list.DeriveWithSizeDelta(
++      font_size_delta));
++  return label;
++}
++
++}  // namespace
++
++QuickTranslateMenuView::QuickTranslateMenuView() {
++  SetLayoutManager(std::make_unique<views::BoxLayout>(
++      views::BoxLayout::Orientation::kVertical,
++      gfx::Insets::VH(kVerticalPadding, kHorizontalPadding),
++      kBetweenLabelSpacing));
++
++  // Smaller, muted "SourceLang -> TargetLang" line above the prominent
++  // translated text - the same visual hierarchy as a subtitle under a title.
++  language_pair_label_ = AddChildView(
++      CreateRowLabel(ui::kColorMenuItemForegroundSecondary, -1));
++  language_pair_label_->SetVisible(false);
++
++  text_label_ = AddChildView(
++      CreateRowLabel(ui::kColorMenuItemForeground, /*font_size_delta=*/0));
++  text_label_->SetText(
++      l10n_util::GetStringUTF16(IDS_QUICK_TRANSLATE_MENU_ITEM));
++}
++
++QuickTranslateMenuView::~QuickTranslateMenuView() = default;
++
++void QuickTranslateMenuView::SetResult(
++    const QuickTranslateProvider::Result& result) {
++  using Status = QuickTranslateProvider::Status;
++  const std::string app_locale = g_browser_process->GetApplicationLocale();
++
++  language_pair_label_->SetVisible(result.status == Status::kOk);
++
++  switch (result.status) {
++    case Status::kOk: {
++      std::u16string target_name = l10n_util::GetDisplayNameForLocale(
++          result.target_language, app_locale, /*is_for_ui=*/true);
++      if (!result.source_language.empty()) {
++        std::u16string source_name = l10n_util::GetDisplayNameForLocale(
++            result.source_language, app_locale, /*is_for_ui=*/true);
++        language_pair_label_->SetText(source_name + u" → " +
++                                      target_name);
++      } else {
++        language_pair_label_->SetText(target_name);
++      }
++      text_label_->SetText(result.translated_text);
++      break;
++    }
++    case Status::kSameLanguage:
++      text_label_->SetText(
++          l10n_util::GetStringUTF16(IDS_QUICK_TRANSLATE_ALREADY_TRANSLATED));
++      break;
++    case Status::kUnsupportedLanguage:
++      text_label_->SetText(l10n_util::GetStringUTF16(
++          IDS_QUICK_TRANSLATE_UNSUPPORTED_LANGUAGE));
++      break;
++    case Status::kNotReady:
++      text_label_->SetText(
++          l10n_util::GetStringUTF16(IDS_QUICK_TRANSLATE_PREPARING));
++      break;
++    case Status::kError:
++      text_label_->SetText(
++          l10n_util::GetStringUTF16(IDS_QUICK_TRANSLATE_UNAVAILABLE));
++      break;
++  }
++
++  // Notifies the MenuItemView/SubmenuView ancestry that this view's
++  // preferred size may have changed, which is what actually lets an
++  // ALREADY-OPEN menu resize/reposition itself (see
++  // SubmenuView::ChildPreferredSizeChanged() and
++  // set_resize_open_menu(true) in render_view_context_menu_views.cc) -
++  // InvalidateLayout() alone only re-lays-out this view's own children.
++  PreferredSizeChanged();
++}
++
++base::WeakPtr<QuickTranslateMenuView> QuickTranslateMenuView::GetWeakPtr() {
++  return weak_ptr_factory_.GetWeakPtr();
++}
++
++gfx::Size QuickTranslateMenuView::CalculatePreferredSize(
++    const views::SizeBounds& available_size) const {
++  // Multi-line labels can only report a correct wrapped HEIGHT once a width
++  // is fixed. Use the real width we're being laid out at whenever the
++  // caller actually provides one (true once the menu is open and
++  // SubmenuView::ChildPreferredSizeChanged() re-queries this after
++  // set_resize_open_menu(true) - see render_view_context_menu_views.cc) so
++  // the height stays genuinely dynamic and matches the real content. Only
++  // fall back to a fixed estimate for the very first query, before the menu
++  // has an established width to report (unbounded available_size) - a menu
++  // a bit taller than strictly necessary there beats one that clips.
++  int width = available_size.width().value_or(kFixedWidthForHeightCalc);
++  int height = GetLayoutManager()->GetPreferredHeightForWidth(this, width);
++  return gfx::Size(width, height);
++}
++
++BEGIN_METADATA(QuickTranslateMenuView)
++END_METADATA
++
++}  // namespace quick_translate
+diff --git a/chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.h b/chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.h
+new file mode 100644
+index 0000000000..5c4e3da78d
+--- /dev/null
++++ b/chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.h
+@@ -0,0 +1,55 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_UI_VIEWS_RENDERER_CONTEXT_MENU_QUICK_TRANSLATE_MENU_VIEW_H_
++#define CHROME_BROWSER_UI_VIEWS_RENDERER_CONTEXT_MENU_QUICK_TRANSLATE_MENU_VIEW_H_
++
++#include "base/memory/raw_ptr.h"
++#include "base/memory/weak_ptr.h"
++#include "chrome/browser/quick_translate/quick_translate_provider.h"
++#include "ui/base/metadata/metadata_header_macros.h"
++#include "ui/views/view.h"
++
++namespace views {
++class Label;
++}  // namespace views
++
++namespace quick_translate {
++
++// Inline "SourceLang -> TargetLang" + translation preview painted directly
++// inside the Quick Translate context-menu row - not a separate popup/bubble.
++// Uses the same child-view-inside-a-MenuItemView technique as AppMenu's
++// ZoomView (chrome/browser/ui/views/toolbar/app_menu.cc): a plain
++// views::View added via MenuItemView::AddChildView() +
++// set_children_use_full_width(true).
++class QuickTranslateMenuView : public views::View {
++  METADATA_HEADER(QuickTranslateMenuView, views::View)
++
++ public:
++  QuickTranslateMenuView();
++  ~QuickTranslateMenuView() override;
++
++  QuickTranslateMenuView(const QuickTranslateMenuView&) = delete;
++  QuickTranslateMenuView& operator=(const QuickTranslateMenuView&) = delete;
++
++  // Updates the row in place to reflect `result` - safe to call while the
++  // menu is still open (Label::SetText() triggers a repaint of an open
++  // menu, the same way ZoomView's live percentage label does).
++  void SetResult(const QuickTranslateProvider::Result& result);
++
++  base::WeakPtr<QuickTranslateMenuView> GetWeakPtr();
++
++  // views::View:
++  gfx::Size CalculatePreferredSize(
++      const views::SizeBounds& available_size) const override;
++
++ private:
++  raw_ptr<views::Label> language_pair_label_ = nullptr;
++  raw_ptr<views::Label> text_label_ = nullptr;
++  base::WeakPtrFactory<QuickTranslateMenuView> weak_ptr_factory_{this};
++};
++
++}  // namespace quick_translate
++
++#endif  // CHROME_BROWSER_UI_VIEWS_RENDERER_CONTEXT_MENU_QUICK_TRANSLATE_MENU_VIEW_H_
+diff --git a/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.cc b/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.cc
+index d38a53955f..47894a1c7d 100644
+--- a/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.cc
++++ b/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.cc
+@@ -7,13 +7,16 @@
+ #include <utility>
+ 
+ #include "base/command_line.h"
++#include "base/functional/bind.h"
+ #include "base/logging.h"
+ #include "base/memory/raw_ptr.h"
+ #include "base/scoped_observation.h"
+ #include "base/task/current_thread.h"
+ #include "build/build_config.h"
+ #include "chrome/app/chrome_command_ids.h"
++#include "chrome/browser/quick_translate/quick_translate_request.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.h"
+ #include "chrome/browser/ui/views/side_panel/side_panel_coordinator.h"
+ #include "chrome/common/chrome_switches.h"
+ #include "components/lens/buildflags.h"
+@@ -408,6 +411,42 @@ void RenderViewContextMenuViews::Show() {
+   if (screen_position_client) {
+     screen_position_client->ConvertPointToScreen(target_window, &screen_point);
+   }
++  // NBrowser: attach the local Quick Translate inline preview, if the model
++  // added the row (see RenderViewContextMenu::AppendQuickTranslateItem()).
++  // Must happen before the blocking RunMenuAt() call below - control doesn't
++  // return here until the menu closes, so there is no other place in this
++  // function to do it. RefreshQuickTranslateView() also gets re-invoked
++  // whenever the menu is rebuilt (see its own comment and
++  // ToolkitDelegateViews::RebuildMenu()), so the row survives things like
++  // late-arriving async spellcheck suggestions.
++  RefreshQuickTranslateView();
++  static_cast<ToolkitDelegateViews*>(toolkit_delegate())
++      ->set_rebuild_callback(base::BindRepeating(
++          &RenderViewContextMenuViews::RefreshQuickTranslateView,
++          base::Unretained(this)));
++  if (views::SubmenuView* root_submenu =
++          static_cast<ToolkitDelegateViews*>(toolkit_delegate())
++              ->menu_view()
++              ->GetSubmenu()) {
++    // NBrowser: without this, an already-open menu never resizes/repositions
++    // itself when a child's preferred size changes later - which is exactly
++    // what happens here (the Quick Translate row starts as one short
++    // placeholder line, then grows once the translation arrives). See
++    // SubmenuView::ChildPreferredSizeChanged() (ui/views/controls/menu/
++    // submenu_view.cc) - it's a no-op unless this flag is set.
++    root_submenu->set_resize_open_menu(true);
++  }
++  if (static_cast<ToolkitDelegateViews*>(toolkit_delegate())
++          ->menu_view()
++          ->GetMenuItemByID(kQuickTranslateMenuId)) {
++    quick_translate_request_ =
++        std::make_unique<quick_translate::QuickTranslateRequest>();
++    quick_translate_request_->Start(
++        GetProfile(), params().selection_text,
++        base::BindOnce(&RenderViewContextMenuViews::OnQuickTranslateResult,
++                       base::Unretained(this)));
++  }
++
+   // Enable recursive tasks on the message loop so we can get updates while
+   // the context menu is being displayed.
+   base::CurrentThread::ScopedAllowApplicationTasksInNativeNestedLoop allow;
+@@ -429,6 +468,40 @@ void RenderViewContextMenuViews::Show() {
+   }
+ }
+ 
++void RenderViewContextMenuViews::RefreshQuickTranslateView() {
++  views::MenuItemView* quick_translate_item =
++      static_cast<ToolkitDelegateViews*>(toolkit_delegate())
++          ->menu_view()
++          ->GetMenuItemByID(kQuickTranslateMenuId);
++  LOG(WARNING) << "QuickTranslate: RefreshQuickTranslateView, item="
++              << quick_translate_item
++              << " has_view=" << !!quick_translate_menu_view_
++              << " has_result=" << quick_translate_result_.has_value();
++  if (!quick_translate_item) {
++    return;
++  }
++
++  if (!quick_translate_menu_view_) {
++    // Either the first attach, or RebuildMenu() just destroyed the previous
++    // child view along with the rest of the item's old subtree - (re)create
++    // it either way.
++    auto view = std::make_unique<quick_translate::QuickTranslateMenuView>();
++    quick_translate_menu_view_ = view->GetWeakPtr();
++    quick_translate_item->AddChildView(std::move(view));
++    quick_translate_item->set_children_use_full_width(true);
++  }
++
++  if (quick_translate_result_) {
++    quick_translate_menu_view_->SetResult(*quick_translate_result_);
++  }
++}
++
++void RenderViewContextMenuViews::OnQuickTranslateResult(
++    quick_translate::QuickTranslateProvider::Result result) {
++  quick_translate_result_ = std::move(result);
++  RefreshQuickTranslateView();
++}
++
+ views::Widget* RenderViewContextMenuViews::GetTopLevelWidget() {
+   return views::Widget::GetTopLevelWidgetForNativeView(GetActiveNativeView());
+ }
+diff --git a/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.h b/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.h
+index b0619927b0..90dfd537a6 100644
+--- a/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.h
++++ b/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.h
+@@ -5,6 +5,11 @@
+ #ifndef CHROME_BROWSER_UI_VIEWS_RENDERER_CONTEXT_MENU_RENDER_VIEW_CONTEXT_MENU_VIEWS_H_
+ #define CHROME_BROWSER_UI_VIEWS_RENDERER_CONTEXT_MENU_RENDER_VIEW_CONTEXT_MENU_VIEWS_H_
+ 
++#include <memory>
++#include <optional>
++
++#include "base/memory/weak_ptr.h"
++#include "chrome/browser/quick_translate/quick_translate_provider.h"
+ #include "chrome/browser/renderer_context_menu/render_view_context_menu.h"
+ #include "ui/base/mojom/menu_source_type.mojom-forward.h"
+ 
+@@ -24,6 +29,11 @@ namespace ui {
+ class AcceleratorProvider;
+ }
+ 
++namespace quick_translate {
++class QuickTranslateMenuView;
++class QuickTranslateRequest;
++}  // namespace quick_translate
++
+ class RenderViewContextMenuViews : public RenderViewContextMenu {
+  public:
+   RenderViewContextMenuViews(const RenderViewContextMenuViews&) = delete;
+@@ -74,12 +84,38 @@ class RenderViewContextMenuViews : public RenderViewContextMenu {
+   void OnSubmenuViewBoundsChanged(const gfx::Rect& new_bounds_in_screen);
+   void OnSubmenuClosed();
+ 
++  // NBrowser: (re)attaches the Quick Translate inline preview to whatever
++  // the CURRENT live MenuItemView for kQuickTranslateMenuId is, and applies
++  // `quick_translate_result_` if a translation has already completed. Called
++  // from Show() (first attach), from ToolkitDelegateViews' rebuild callback
++  // (RebuildMenu() destroys and recreates the item, e.g. when async
++  // spellcheck suggestions arrive - see toolkit_delegate_views.cc), and from
++  // OnQuickTranslateResult() (translation completed).
++  void RefreshQuickTranslateView();
++  void OnQuickTranslateResult(quick_translate::QuickTranslateProvider::Result
++                                  result);
++
+   // Model for the BiDi input submenu.
+   ui::SimpleMenuModel bidi_submenu_model_;
+ 
+   // View observer of the submenu view and widget. SubmenuViewObserver is used
+   // to observe bounds changes.
+   std::unique_ptr<SubmenuViewObserver> submenu_view_observer_;
++
++  // NBrowser: drives the local Quick Translate preview row (see
++  // chrome/browser/quick_translate/). `quick_translate_request_` outlives
++  // the menu; `quick_translate_menu_view_` is a weak reference to the child
++  // view currently attached to the live MenuItemView tree (invalidated by
++  // RebuildMenu() - see RefreshQuickTranslateView());
++  // `quick_translate_result_` is cached so a rebuild that happens after the
++  // translation already completed can still show it on the freshly
++  // recreated view.
++  std::unique_ptr<quick_translate::QuickTranslateRequest>
++      quick_translate_request_;
++  base::WeakPtr<quick_translate::QuickTranslateMenuView>
++      quick_translate_menu_view_;
++  std::optional<quick_translate::QuickTranslateProvider::Result>
++      quick_translate_result_;
+ };
+ 
+ #endif  // CHROME_BROWSER_UI_VIEWS_RENDERER_CONTEXT_MENU_RENDER_VIEW_CONTEXT_MENU_VIEWS_H_
+diff --git a/components/renderer_context_menu/views/toolkit_delegate_views.cc b/components/renderer_context_menu/views/toolkit_delegate_views.cc
+index 0be2640c81..af7dda26bb 100644
+--- a/components/renderer_context_menu/views/toolkit_delegate_views.cc
++++ b/components/renderer_context_menu/views/toolkit_delegate_views.cc
+@@ -47,4 +47,7 @@ void ToolkitDelegateViews::Cancel() {
+ 
+ void ToolkitDelegateViews::RebuildMenu() {
+   menu_adapter_->BuildMenu(menu_view_);
++  if (rebuild_callback_) {
++    rebuild_callback_.Run();
++  }
+ }
+diff --git a/components/renderer_context_menu/views/toolkit_delegate_views.h b/components/renderer_context_menu/views/toolkit_delegate_views.h
+index 7762b3e667..0cdc14dc89 100644
+--- a/components/renderer_context_menu/views/toolkit_delegate_views.h
++++ b/components/renderer_context_menu/views/toolkit_delegate_views.h
+@@ -7,6 +7,7 @@
+ 
+ #include <memory>
+ 
++#include "base/functional/callback.h"
+ #include "base/memory/raw_ptr.h"
+ #include "components/renderer_context_menu/render_view_context_menu_base.h"
+ #include "ui/base/mojom/menu_source_type.mojom-forward.h"
+@@ -40,6 +41,17 @@ class ToolkitDelegateViews : public RenderViewContextMenuBase::ToolkitDelegate {
+                  ui::mojom::MenuSourceType type);
+   views::MenuItemView* menu_view() { return menu_view_; }
+ 
++  // NBrowser: RebuildMenu() (called for things like late-arriving async
++  // spellcheck suggestions, see RenderViewContextMenuBase::UpdateMenuItem())
++  // destroys and recreates the whole MenuItemView subtree in place, with no
++  // other notification of this - any custom child view a caller attached to
++  // one of those items (see Quick Translate's inline preview,
++  // RenderViewContextMenuViews::Show()) is silently gone afterward. Lets
++  // such a caller re-attach when that happens instead of only once up front.
++  void set_rebuild_callback(base::RepeatingClosure callback) {
++    rebuild_callback_ = std::move(callback);
++  }
++
+  protected:
+   // ToolkitDelegate:
+   void Init(ui::SimpleMenuModel* menu_model) override;
+@@ -54,6 +66,8 @@ class ToolkitDelegateViews : public RenderViewContextMenuBase::ToolkitDelegate {
+ 
+   // Weak. Owned by menu_runner_;
+   raw_ptr<views::MenuItemView> menu_view_ = nullptr;
++
++  base::RepeatingClosure rebuild_callback_;
+ };
+ 
+ #endif  // COMPONENTS_RENDERER_CONTEXT_MENU_VIEWS_TOOLKIT_DELEGATE_VIEWS_H_

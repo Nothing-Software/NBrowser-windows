@@ -162,6 +162,37 @@
       <message name="IDS_NBROWSER_UPDATE_AUTO_INSTALL_TOGGLE_SUB_LABEL" desc="Sub-label under the auto-update toggle on chrome://settings/help, explaining what turning it off does.">
         When off, you'll be asked before each update is installed.
       </message>
+
+      <!-- Quick Translate context-menu preview row (chrome/browser/quick_translate/, chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.h). No <ph> placeholders on purpose, same reason as the update infobar strings above - dynamic language names/translated text are composed directly in C++, not via message substitution. -->
+      <message name="IDS_QUICK_TRANSLATE_MENU_ITEM" desc="Initial/fallback label for the Quick Translate context-menu row, shown for a moment before the live translation preview replaces it.">
+        Quick Translate
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_PREPARING" desc="Status text shown in the Quick Translate context-menu row while the local translation engine is starting up.">
+        Preparing translation…
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_UNAVAILABLE" desc="Status text shown in the Quick Translate context-menu row when translation failed for an unspecified reason.">
+        Translation unavailable
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_UNSUPPORTED_LANGUAGE" desc="Status text shown in the Quick Translate context-menu row when the detected or target language isn't supported by the local engine.">
+        Translation not available for this language
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_ALREADY_TRANSLATED" desc="Status text shown in the Quick Translate context-menu row when the selected text is already in the user's configured target language.">
+        Already in this language
+      </message>
+
+      <!-- Quick Translate settings toggles, chrome://settings/languages under the Translator section (chrome/browser/resources/settings/languages_page/translate_page.html, chrome/browser/quick_translate/quick_translate_prefs.h). -->
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_ENABLED_LABEL" desc="Label for the settings toggle that turns the local Quick Translate context-menu feature on or off.">
+        Use Quick Translate
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_ENABLED_SUBLABEL" desc="Sub-label under the Quick Translate settings toggle, explaining it runs fully on-device.">
+        Doesn't require an internet connection - uses a local language model
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_USE_ONLINE_MODEL_LABEL" desc="Label for a settings toggle reserved for a future opt-in remote/online Quick Translate backend - not wired to any behavior yet.">
+        Use an online model for Quick Translate
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_USE_ONLINE_MODEL_SUBLABEL" desc="Sub-label under the online-model settings toggle, disclosing that it would send data to Google.">
+        Uses Google's API when available to improve quality (sends data to Google)
+      </message>
     </messages>
   </release>
 </grit>

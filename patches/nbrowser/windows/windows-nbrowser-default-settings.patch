@@ -1,101 +1,17 @@
---- a/chrome/browser/prefs/session_startup_pref.cc
-+++ b/chrome/browser/prefs/session_startup_pref.cc
-@@ -75,7 +75,7 @@ SessionStartupPref::Type SessionStartupPref::GetDefaultStartupType() {
-     return SessionStartupPref::LAST;
-   }
- #endif
--  return SessionStartupPref::DEFAULT;
-+  return SessionStartupPref::LAST;
- #endif
- }
-
---- a/components/bookmarks/browser/bookmark_utils.cc
-+++ b/components/bookmarks/browser/bookmark_utils.cc
-@@ -451,7 +451,7 @@ bool DoesBookmarkContainWords(const std::u16string& title,
-
- void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
-   registry->RegisterBooleanPref(
--      prefs::kShowBookmarkBar, true,
-+      prefs::kShowBookmarkBar, false,
-       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
-   // `BookmarkBarVisibilityState::kOnlyShowOnNtp` is equivalent to
-   // `kShowBookmarkBar` set to false.
-@@ -464,7 +464,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
-       prefs::kShowAppsShortcutInBookmarkBar, false,
-       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
-   registry->RegisterBooleanPref(
--      prefs::kShowTabGroupsInBookmarkBar, true,
-+      prefs::kShowTabGroupsInBookmarkBar, false,
-       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
-   registry->RegisterBooleanPref(
-       prefs::kShowManagedBookmarksInBookmarkBar, true,
---- a/components/saved_tab_groups/public/pref_names.cc
-+++ b/components/saved_tab_groups/public/pref_names.cc
-@@ -33,7 +33,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
- #endif  // BUILDFLAG(IS_ANDROID)
-
-   registry->RegisterBooleanPref(
--      kAutoPinNewTabGroups, true,
-+      kAutoPinNewTabGroups, false,
-       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
-
-   registry->RegisterBooleanPref(prefs::kSavedTabGroupSpecificsToDataMigration,
---- a/components/autofill/core/common/autofill_prefs.cc
-+++ b/components/autofill/core/common/autofill_prefs.cc
-@@ -106,3 +106,3 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
-       kAutofillAiPrivateInferenceNoticeFirstShownTimestamp, base::Time());
--  registry->RegisterBooleanPref(kAutofillEmailVerificationEnabled, true);
-+  registry->RegisterBooleanPref(kAutofillEmailVerificationEnabled, false);
-   registry->RegisterDictionaryPref(kAutofillEmailVerificationState);
---- a/chrome/browser/ui/toolbar/toolbar_pref_names.cc
-+++ b/chrome/browser/ui/toolbar/toolbar_pref_names.cc
-@@ -23,6 +23,12 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
-     default_pinned_actions.Append(chrome_labs_action.value());
-   }
-
-+  const std::optional<std::string>& translate_action =
-+      actions::ActionIdMap::ActionIdToString(kActionShowTranslate);
-+  if (translate_action.has_value()) {
-+    default_pinned_actions.Append(translate_action.value());
-+  }
-+
-   if (base::FeatureList::IsEnabled(
-           features::kTabsFromOtherDevicesSidePanelPinnedByDefault)) {
-     const std::optional<std::string>& tabs_from_other_devices_action =
---- a/chrome/browser/ui/browser_ui_prefs.cc
-+++ b/chrome/browser/ui/browser_ui_prefs.cc
-@@ -145,7 +145,7 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
-   registry->RegisterDictionaryPref(prefs::kBrowserWindowPlacementPopup);
-   registry->RegisterDictionaryPref(prefs::kAppWindowPlacement);
-   registry->RegisterBooleanPref(
--      prefs::kEnableDoNotTrack, false,
-+      prefs::kEnableDoNotTrack, true,
-       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
- #if !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_ANDROID)
-   registry->RegisterBooleanPref(prefs::kPrintPreviewUseSystemDefaultPrinter,
-@@ -218,7 +218,7 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
- #endif
-
-   registry->RegisterBooleanPref(
--      prefs::kHttpsOnlyModeEnabled, false,
-+      prefs::kHttpsOnlyModeEnabled, true,
-       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
-   registry->RegisterBooleanPref(
-       prefs::kHttpsFirstBalancedMode, false,
---- a/chrome/browser/profiles/profile_impl.cc
-+++ b/chrome/browser/profiles/profile_impl.cc
-@@ -420,7 +420,7 @@ void ProfileImpl::RegisterProfilePrefs(
-   registry->RegisterStringPref(prefs::kHomePage, std::string(),
-                                home_page_flags);
-   registry->RegisterStringPref(prefs::kNewTabPageLocationOverride,
--                               std::string());
-+                               "chrome://new-tab-page");
-
- #if BUILDFLAG(ENABLE_PRINTING)
-   registry->RegisterBooleanPref(prefs::kPrintingEnabled, true);
+diff --git a/chrome/app/chrome_main_delegate.cc b/chrome/app/chrome_main_delegate.cc
+index 45f00944bf..ddd90fd5fa 100644
 --- a/chrome/app/chrome_main_delegate.cc
 +++ b/chrome/app/chrome_main_delegate.cc
-@@ -1088,6 +1088,19 @@ std::optional<int> ChromeMainDelegate::BasicStartupComplete() {
+@@ -76,6 +76,8 @@
+ #include "components/memory_system/initializer.h"
+ #include "components/memory_system/parameters.h"
+ #include "components/metrics/persistent_histograms.h"
++#include "components/on_device_translation/features.h"
++#include "components/optimization_guide/core/optimization_guide_switches.h"
+ #include "components/sampling_profiler/thread_profiler.h"
+ #include "components/startup_metric_utils/common/startup_metric_utils.h"
+ #include "components/variations/service/variations_network_clock.h"
+@@ -1100,6 +1102,58 @@ std::optional<int> ChromeMainDelegate::BasicStartupComplete() {
    // The DevTools remote debugging pipe file descriptors need to be checked
    // before any other files are opened, see https://crbug.com/40259890.
    const bool is_browser = !command_line.HasSwitch(switches::kProcessType);
@@ -111,7 +27,228 @@
 +    // choice, forced independent of chrome://flags for the same reason.
 +    base::CommandLine::ForCurrentProcess()->AppendSwitchASCII(
 +        "close-window-with-last-tab", "never");
++
++    // NBrowser: point the on-device translation engine (TranslateKit) at the
++    // copy bundled with this install instead of relying on component
++    // updater, which ungoogled-chromium's block-requests.patch disables
++    // unconditionally (see components/update_client/update_checker.cc) -
++    // Quick Translate would otherwise never receive the engine/language
++    // packs it needs. "translate-kit-packages" mirrors the literal switch
++    // name in chrome/browser/on_device_translation/installer_impl.cc (it's
++    // not exported as a symbol from that file).
++    base::FilePath install_dir;
++    if (base::PathService::Get(base::DIR_ASSETS, &install_dir)) {
++      base::FilePath translate_kit_dir =
++          install_dir.AppendASCII("TranslateKitFiles");
++      base::CommandLine::ForCurrentProcess()->AppendSwitchPath(
++          on_device_translation::kTranslateKitBinaryPath,
++          translate_kit_dir.Append(
++              FILE_PATH_LITERAL("libtranslatekit.dll")));
++      base::CommandLine::ForCurrentProcess()->AppendSwitchNative(
++          "translate-kit-packages",
++          FILE_PATH_LITERAL("en,ru,") +
++              translate_kit_dir.Append(FILE_PATH_LITERAL("LanguagePacks"))
++                  .Append(FILE_PATH_LITERAL("en_ru"))
++                  .value());
++
++      // NBrowser: point local language detection (used to guess Quick
++      // Translate's source language) at the model file bundled with this
++      // install, the same way as TranslateKit just above - its real delivery
++      // path (Optimization Guide's model fetcher) needs a Google API key
++      // that ungoogled-chromium blanks out, so it never downloads on its
++      // own. --optimization-guide-model-override is a real, existing
++      // upstream flag for exactly this ("point this optimization target at
++      // a local file"), not something added for this feature.
++      base::CommandLine::ForCurrentProcess()->AppendSwitchNative(
++          optimization_guide::switches::kModelOverride,
++          FILE_PATH_LITERAL("OPTIMIZATION_TARGET_LANGUAGE_DETECTION|") +
++              install_dir.AppendASCII("LanguageDetectionModel")
++                  .Append(FILE_PATH_LITERAL("model.tflite"))
++                  .value());
++    }
 +  }
  #if BUILDFLAG(IS_WIN)
    const bool pipes_are_specified_explicitly =
        command_line.HasSwitch(::switches::kRemoteDebuggingIoPipes);
+diff --git a/chrome/browser/prefs/session_startup_pref.cc b/chrome/browser/prefs/session_startup_pref.cc
+index dd071315ef..fe4c0633e0 100644
+--- a/chrome/browser/prefs/session_startup_pref.cc
++++ b/chrome/browser/prefs/session_startup_pref.cc
+@@ -75,7 +75,7 @@ SessionStartupPref::Type SessionStartupPref::GetDefaultStartupType() {
+     return SessionStartupPref::LAST;
+   }
+ #endif
+-  return SessionStartupPref::DEFAULT;
++  return SessionStartupPref::LAST;
+ #endif
+ }
+ 
+diff --git a/chrome/browser/profiles/profile_impl.cc b/chrome/browser/profiles/profile_impl.cc
+index f3ca43e49d..a21fdcabf8 100644
+--- a/chrome/browser/profiles/profile_impl.cc
++++ b/chrome/browser/profiles/profile_impl.cc
+@@ -153,7 +153,6 @@
+ #include "components/profile_metrics/browser_profile_type.h"
+ #include "components/safe_search_api/safe_search_util.h"
+ #include "components/security_interstitials/content/stateful_ssl_host_state_delegate.h"
+-#include "components/signin/public/base/signin_pref_names.h"
+ #include "components/signin/public/base/signin_switches.h"
+ #include "components/signin/public/identity_manager/identity_manager.h"
+ #include "components/site_isolation/site_isolation_policy.h"
+@@ -420,7 +419,7 @@ void ProfileImpl::RegisterProfilePrefs(
+   registry->RegisterStringPref(prefs::kHomePage, std::string(),
+                                home_page_flags);
+   registry->RegisterStringPref(prefs::kNewTabPageLocationOverride,
+-                               std::string());
++                               "chrome://new-tab-page");
+ 
+ #if BUILDFLAG(ENABLE_PRINTING)
+   registry->RegisterBooleanPref(prefs::kPrintingEnabled, true);
+@@ -919,11 +918,6 @@ void ProfileImpl::DoFinalInit(CreateMode create_mode) {
+   // The password settings service needs to start listening to settings
+   // changes from Google Mobile Services, as early as possible.
+   PasswordManagerSettingsServiceFactory::GetForProfile(this);
+-#else
+-
+-  if (features::IsMainNodeAnnotationsEnabled()) {
+-    screen_ai::AXMainNodeAnnotatorControllerFactory::GetForProfile(this);
+-  }
+ #endif  // BUILDFLAG(IS_ANDROID)
+ 
+   // The announcement notification  service might not be available for some
+@@ -1172,17 +1166,8 @@ void ProfileImpl::OnLocaleReady(CreateMode create_mode) {
+ #if !BUILDFLAG(IS_ANDROID)
+   CHECK(!ThemeServiceFactory::GetForProfileIfExists(this));
+ 
+-  if (create_mode == CreateMode::kAsynchronous) {
+-    browser_sync::MaybeMigrateSyncingUserToSignedInAsync(
+-        GetPath(), GetPrefs(),
+-        base::BindOnce(&ProfileImpl::OnSyncToSigninMigrationMaybeCompleted,
+-                       weak_ptr_factory_.GetWeakPtr(), create_mode));
+-  } else
+ #endif  // !BUILDFLAG(IS_ANDROID)
+-  {
+-    browser_sync::MaybeMigrateSyncingUserToSignedIn(GetPath(), GetPrefs());
+     OnSyncToSigninMigrationMaybeCompleted(create_mode);
+-  }
+ }
+ 
+ void ProfileImpl::OnSyncToSigninMigrationMaybeCompleted(
+diff --git a/chrome/browser/ui/browser_ui_prefs.cc b/chrome/browser/ui/browser_ui_prefs.cc
+index 7b0257c24d..3d18838232 100644
+--- a/chrome/browser/ui/browser_ui_prefs.cc
++++ b/chrome/browser/ui/browser_ui_prefs.cc
+@@ -139,26 +139,26 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
+   registry->RegisterBooleanPref(prefs::kWebAppCreateInAppsMenu, true);
+   registry->RegisterBooleanPref(prefs::kWebAppCreateInQuickLaunchBar, true);
+   registry->RegisterBooleanPref(
+-      translate::prefs::kOfferTranslateEnabled, true,
++      translate::prefs::kOfferTranslateEnabled, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterDictionaryPref(prefs::kBrowserWindowPlacement);
+   registry->RegisterDictionaryPref(prefs::kBrowserWindowPlacementPopup);
+   registry->RegisterDictionaryPref(prefs::kAppWindowPlacement);
+   registry->RegisterBooleanPref(
+-      prefs::kEnableDoNotTrack, false,
++      prefs::kEnableDoNotTrack, true,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+ #if !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_ANDROID)
+   registry->RegisterBooleanPref(prefs::kPrintPreviewUseSystemDefaultPrinter,
+                                 false);
+ #endif
+   registry->RegisterStringPref(prefs::kWebRTCIPHandlingPolicy,
+-                               blink::kWebRTCIPHandlingDefault);
++                               blink::kWebRTCIPHandlingDisableNonProxiedUdp);
+   registry->RegisterListPref(prefs::kWebRTCIPHandlingUrl, base::ListValue());
+   registry->RegisterBooleanPref(prefs::kWebRTCPostQuantumKeyAgreement, false);
+   registry->RegisterStringPref(prefs::kWebRTCUDPPortRange, std::string());
+   registry->RegisterBooleanPref(prefs::kWebRtcEventLogCollectionAllowed, false);
+   registry->RegisterListPref(prefs::kWebRtcLocalIpsAllowedUrls);
+-  registry->RegisterBooleanPref(prefs::kWebRtcTextLogCollectionAllowed, true);
++  registry->RegisterBooleanPref(prefs::kWebRtcTextLogCollectionAllowed, false);
+   registry->RegisterListPref(
+       prefs::kWebRTCDiagnosticLogCollectionAllowedForOrigins,
+       base::ListValue());
+@@ -216,7 +216,7 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
+ #endif
+ 
+   registry->RegisterBooleanPref(
+-      prefs::kHttpsOnlyModeEnabled, false,
++      prefs::kHttpsOnlyModeEnabled, true,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterBooleanPref(
+       prefs::kHttpsFirstBalancedMode, false,
+diff --git a/chrome/browser/ui/toolbar/toolbar_pref_names.cc b/chrome/browser/ui/toolbar/toolbar_pref_names.cc
+index d93b933b81..8b0d9dcd47 100644
+--- a/chrome/browser/ui/toolbar/toolbar_pref_names.cc
++++ b/chrome/browser/ui/toolbar/toolbar_pref_names.cc
+@@ -23,6 +23,12 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+     default_pinned_actions.Append(chrome_labs_action.value());
+   }
+ 
++  const std::optional<std::string>& translate_action =
++      actions::ActionIdMap::ActionIdToString(kActionShowTranslate);
++  if (translate_action.has_value()) {
++    default_pinned_actions.Append(translate_action.value());
++  }
++
+   if (base::FeatureList::IsEnabled(
+           features::kTabsFromOtherDevicesSidePanelPinnedByDefault)) {
+     const std::optional<std::string>& tabs_from_other_devices_action =
+diff --git a/components/autofill/core/common/autofill_prefs.cc b/components/autofill/core/common/autofill_prefs.cc
+index 8d4571bb8d..e30acf0634 100644
+--- a/components/autofill/core/common/autofill_prefs.cc
++++ b/components/autofill/core/common/autofill_prefs.cc
+@@ -41,7 +41,7 @@ constexpr char kAutofillAiSyncedOptInStatusDeprecated[] =
+ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+   // Synced prefs. Used for cross-device choices, e.g., credit card Autofill.
+   registry->RegisterBooleanPref(
+-      kAutofillProfileEnabled, true,
++      kAutofillProfileEnabled, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterIntegerPref(
+       kAutofillLastVersionDeduped, 0,
+@@ -72,7 +72,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+       kAutofillHasSeenIban, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterBooleanPref(
+-      kAutofillCreditCardEnabled, true,
++      kAutofillCreditCardEnabled, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterBooleanPref(
+       kAutofillPaymentCvcStorage, true,
+@@ -104,7 +104,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+       kAutofillAiPrivateInferenceNoticeAcknowledgedTimestamp, base::Time());
+   registry->RegisterTimePref(
+       kAutofillAiPrivateInferenceNoticeFirstShownTimestamp, base::Time());
+-  registry->RegisterBooleanPref(kAutofillEmailVerificationEnabled, true);
++  registry->RegisterBooleanPref(kAutofillEmailVerificationEnabled, false);
+   registry->RegisterDictionaryPref(kAutofillEmailVerificationState);
+   registry->RegisterBooleanPref(kAutofillCreditCardFidoAuthEnabled, false);
+ #if BUILDFLAG(IS_ANDROID)
+diff --git a/components/bookmarks/browser/bookmark_utils.cc b/components/bookmarks/browser/bookmark_utils.cc
+index d8f32a1ca6..ed003ac952 100644
+--- a/components/bookmarks/browser/bookmark_utils.cc
++++ b/components/bookmarks/browser/bookmark_utils.cc
+@@ -464,7 +464,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+       prefs::kShowAppsShortcutInBookmarkBar, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterBooleanPref(
+-      prefs::kShowTabGroupsInBookmarkBar, true,
++      prefs::kShowTabGroupsInBookmarkBar, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterBooleanPref(
+       prefs::kShowManagedBookmarksInBookmarkBar, true,
+diff --git a/components/saved_tab_groups/public/pref_names.cc b/components/saved_tab_groups/public/pref_names.cc
+index 25681f5b2a..dc4e67b968 100644
+--- a/components/saved_tab_groups/public/pref_names.cc
++++ b/components/saved_tab_groups/public/pref_names.cc
+@@ -33,7 +33,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+ #endif  // BUILDFLAG(IS_ANDROID)
+ 
+   registry->RegisterBooleanPref(
+-      kAutoPinNewTabGroups, true,
++      kAutoPinNewTabGroups, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+ 
+   registry->RegisterBooleanPref(prefs::kSavedTabGroupSpecificsToDataMigration,

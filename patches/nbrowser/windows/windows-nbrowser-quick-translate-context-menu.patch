@@ -1,0 +1,235 @@
+diff --git a/chrome/app/chrome_command_ids.h b/chrome/app/chrome_command_ids.h
+index 9b9707ce49..b78d53d7e6 100644
+--- a/chrome/app/chrome_command_ids.h
++++ b/chrome/app/chrome_command_ids.h
+@@ -77,19 +77,19 @@
+ #define IDC_MINIMIZE_WINDOW             34046
+ #define IDC_MAXIMIZE_WINDOW             34047
+ #define IDC_NAME_WINDOW                 34049
+-#if BUILDFLAG(IS_CHROMEOS)
++#if (0)
+ #define IDC_TOGGLE_MULTITASK_MENU       34050
+ #endif
+ 
+-#if BUILDFLAG(IS_LINUX)
++#if (0)
+ #define IDC_USE_SYSTEM_TITLE_BAR        34051
+ #endif
+ 
+-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN)
++#if (1)
+ #define IDC_RESTORE_WINDOW              34052
+ #endif // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN)
+ 
+-#if BUILDFLAG(IS_WIN)
++#if (1)
+ #define IDC_MOVE_WINDOW                 34053
+ #define IDC_SIZE_WINDOW                 34054
+ #endif // BUILDFLAG(IS_WIN)
+@@ -109,7 +109,7 @@
+ #define IDC_WEB_APP_MENU_APP_INFO       34074
+ #define IDC_WEB_APP_UPGRADE_DIALOG      34075
+ 
+-#if BUILDFLAG(IS_CHROMEOS)
++#if (0)
+ // Move window to other user commands
+ #define IDC_VISIT_DESKTOP_OF_LRU_USER_2 34080
+ #define IDC_VISIT_DESKTOP_OF_LRU_USER_3 34081
+@@ -458,7 +458,7 @@
+ #define IDC_MEDIA_ROUTER_TOGGLE_MEDIA_REMOTING 51208
+ 
+ // Context menu items for media toolbar button
+-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
++#if (0)
+ #define IDC_MEDIA_TOOLBAR_CONTEXT_REPORT_CAST_ISSUE 51209
+ #endif
+ #define IDC_MEDIA_TOOLBAR_CONTEXT_SHOW_OTHER_SESSIONS 51210
+@@ -484,7 +484,7 @@
+ #define IDC_CONTENT_CONTEXT_ACCESSIBILITY_LABELS_TOGGLE 52410
+ #define IDC_CONTENT_CONTEXT_ACCESSIBILITY_LABELS_TOGGLE_ONCE 52412
+ 
+-#if BUILDFLAG(IS_CHROMEOS)
++#if (0)
+ // Quick Answers context menu items.
+ #define IDC_CONTENT_CONTEXT_QUICK_ANSWERS_INLINE_ANSWER 52413
+ #define IDC_CONTENT_CONTEXT_QUICK_ANSWERS_INLINE_QUERY 52414
+@@ -614,6 +614,10 @@ constexpr int kAccessibilityLabelsMenuId = 57314;
+ constexpr int kNoSpellingSuggestionsId = 57313;
+ constexpr int kRecentTabsNoDeviceTabsId = 57312;
+ constexpr int kWritingDirectionDefaultId = 57311;
++
++// NBrowser: non-actionable inline preview row for the local Quick Translate
++// feature (see chrome/browser/quick_translate/).
++constexpr int kQuickTranslateMenuId = 57310;
+ #endif  // RC_INVOKED
+ 
+ 
+diff --git a/chrome/browser/renderer_context_menu/BUILD.gn b/chrome/browser/renderer_context_menu/BUILD.gn
+index 0313a7b60b..f7ffbb991d 100644
+--- a/chrome/browser/renderer_context_menu/BUILD.gn
++++ b/chrome/browser/renderer_context_menu/BUILD.gn
+@@ -139,6 +139,7 @@ source_set("impl") {
+       "//chrome/browser/profiles:misc",
+       "//chrome/browser/profiles:profile",
+       "//chrome/browser/profiles:profile_io_data",
++      "//chrome/browser/quick_translate",
+       "//chrome/browser/reading_list",
+       "//chrome/browser/search_engines",
+       "//chrome/browser/send_tab_to_self",
+@@ -162,6 +163,7 @@ source_set("impl") {
+       "//chrome/browser/ui/user_education",
+       "//chrome/browser/ui/webui:webui_util",
+       "//chrome/browser/ui/webui/history",
++      "//chrome/browser/ui/webui/nbrowser_ui_strings:strings",
+       "//chrome/browser/user_education",
+       "//chrome/common:mojo_bindings",
+       "//components/compose/core/browser",
+diff --git a/chrome/browser/renderer_context_menu/render_view_context_menu.cc b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+index ce8f38b2fb..ac10472219 100644
+--- a/chrome/browser/renderer_context_menu/render_view_context_menu.cc
++++ b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+@@ -85,6 +85,7 @@
+ #include "chrome/browser/profiles/profile_io_data.h"
+ #include "chrome/browser/profiles/profile_manager.h"
+ #include "chrome/browser/profiles/profile_window.h"
++#include "chrome/browser/quick_translate/quick_translate_prefs.h"
+ #include "chrome/browser/reading_list/reading_list_model_factory.h"
+ #include "chrome/browser/renderer_context_menu/accessibility_labels_menu_observer.h"
+ #include "chrome/browser/renderer_context_menu/context_menu_content_type_factory.h"
+@@ -155,6 +156,7 @@
+ #include "chrome/common/pref_names.h"
+ #include "chrome/common/url_constants.h"
+ #include "chrome/common/webui_url_constants.h"
++#include "chrome/browser/ui/webui/nbrowser_ui_strings/grit/nbrowser_ui_strings.h"
+ #include "chrome/grit/branded_strings.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/autofill/content/browser/content_autofill_client.h"
+@@ -209,6 +211,7 @@
+ #include "components/strings/grit/components_strings.h"
+ #include "components/supervised_user/core/browser/supervised_user_preferences.h"
+ #include "components/supervised_user/core/browser/supervised_user_url_filtering_service.h"
++#include "components/translate/core/common/translate_switches.h"
+ #include "components/translate/core/browser/translate_download_manager.h"
+ #include "components/translate/core/browser/translate_manager.h"
+ #include "components/translate/core/browser/translate_prefs.h"
+@@ -1504,6 +1507,11 @@ void RenderViewContextMenu::InitMenu() {
+     menu_model_.RemoveItemAt(0);
+   }
+ 
++  // NBrowser: add the local Quick Translate preview row near the bottom of
++  // the menu, independent of the (disabled) legacy translate items appended
++  // earlier in this function.
++  AppendQuickTranslateItem();
++
+   // Always add read write cards UI last, as it is rendered next to the context
+   // menu, meaning that each menu item added/removed in this function will cause
+   // it to visibly jump on the screen (see b/173569669).
+@@ -2637,6 +2645,7 @@ void RenderViewContextMenu::AppendPageItems() {
+   }
+ 
+   if (CanTranslate(/*menu_logging=*/true)) {
++   if (base::CommandLine::ForCurrentProcess()->HasSwitch(translate::switches::kTranslateScriptURL))
+     AppendTranslateItem();
+   }
+ }
+@@ -2779,6 +2788,31 @@ void RenderViewContextMenu::AppendTranslateItem() {
+                                      ui::kColorMenuIcon, kTabMenuIconSize));
+ }
+ 
++void RenderViewContextMenu::AppendQuickTranslateItem() {
++  if (!content_type_->SupportsGroup(
++          ContextMenuContentType::ITEM_GROUP_QUICK_TRANSLATE)) {
++    LOG(WARNING) << "QuickTranslate: item group not supported, skipping";
++    return;
++  }
++  // chrome://settings/languages, "Переводчик" section - the "Использовать
++  // Быстрый перевод" toggle.
++  if (!GetPrefs(browser_context_)
++           ->GetBoolean(quick_translate::prefs::kQuickTranslateEnabled)) {
++    return;
++  }
++  LOG(WARNING) << "QuickTranslate: adding menu item, id=" << kQuickTranslateMenuId;
++  // The live "SourceLang -> TargetLang" + translated-text preview is filled
++  // in asynchronously as an inline child view by RenderViewContextMenuViews
++  // (see chrome/browser/ui/views/renderer_context_menu/
++  // quick_translate_menu_view.h). The title here MUST stay empty:
++  // MenuItemView::IsContainer() (ui/views/controls/menu/menu_item_view.cc)
++  // only lets a row size itself around its child view's own preferred size
++  // (i.e. grow taller than one line) when the item has exactly one non-icon
++  // child AND an empty title - a non-empty title here would make the row
++  // paint its own single-line label UNDER/behind the child view instead.
++  menu_model_.AddItem(kQuickTranslateMenuId, std::u16string());
++}
++
+ void RenderViewContextMenu::AppendMediaRouterItem() {
+   if (media_router::MediaRouterEnabled(browser_context_)) {
+     AddItemWithOptionalIcon(IDC_ROUTE_MEDIA, IDS_MEDIA_ROUTER_MENU_ITEM_TITLE,
+@@ -3594,6 +3628,11 @@ bool RenderViewContextMenu::IsCommandIdEnabled(int id) const {
+       NOTREACHED() << "Unhandled id: " << id;
+ #endif
+ 
++    // NBrowser: non-actionable Quick Translate preview row - never
++    // clickable, only ever painted via its inline child view.
++    case kQuickTranslateMenuId:
++      return false;
++
+     default:
+       DUMP_WILL_BE_NOTREACHED() << "Unhandled id: " << id;
+       return false;
+@@ -4179,6 +4218,12 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
+     }
+ #endif  // BUILDFLAG(ENABLE_COMPOSE)
+ 
++    // NBrowser: non-actionable Quick Translate preview row - clicking it
++    // (should the framework ever permit it despite being disabled) does
++    // nothing.
++    case kQuickTranslateMenuId:
++      break;
++
+     default:
+       DUMP_WILL_BE_NOTREACHED() << "Unhandled id: " << id;
+       break;
+diff --git a/chrome/browser/renderer_context_menu/render_view_context_menu.h b/chrome/browser/renderer_context_menu/render_view_context_menu.h
+index 0daa02b832..889f6388a8 100644
+--- a/chrome/browser/renderer_context_menu/render_view_context_menu.h
++++ b/chrome/browser/renderer_context_menu/render_view_context_menu.h
+@@ -328,6 +328,10 @@ class RenderViewContextMenu
+   void AppendPrintItem();
+   void AppendPartialTranslateItem();
+   void AppendTranslateItem();
++  // NBrowser: adds the local, on-device Quick Translate preview row.
++  // Independent of AppendPartialTranslateItem()/AppendTranslateItem() above,
++  // which are tied to the legacy, network-based translate pipeline.
++  void AppendQuickTranslateItem();
+   void AppendMediaRouterItem();
+   void AppendReadAnythingItem();
+   void AppendSaveToMemoryBanksItem();
+diff --git a/components/renderer_context_menu/context_menu_content_type.cc b/components/renderer_context_menu/context_menu_content_type.cc
+index 00a75c9bbd..0e4fb62c33 100644
+--- a/components/renderer_context_menu/context_menu_content_type.cc
++++ b/components/renderer_context_menu/context_menu_content_type.cc
+@@ -131,6 +131,9 @@ bool ContextMenuContentType::SupportsGroupInternal(int group) {
+     case ITEM_GROUP_PARTIAL_TRANSLATE:
+       return has_selection;
+ 
++    case ITEM_GROUP_QUICK_TRANSLATE:
++      return has_selection;
++
+     case ITEM_GROUP_EXISTING_LINK_TO_TEXT:
+       return params_.annotation_type.has_value();
+ 
+diff --git a/components/renderer_context_menu/context_menu_content_type.h b/components/renderer_context_menu/context_menu_content_type.h
+index 80a36de3f8..664f7fa7db 100644
+--- a/components/renderer_context_menu/context_menu_content_type.h
++++ b/components/renderer_context_menu/context_menu_content_type.h
+@@ -40,6 +40,10 @@ class ContextMenuContentType {
+     ITEM_GROUP_EDITABLE,
+     ITEM_GROUP_COPY,
+     ITEM_GROUP_PARTIAL_TRANSLATE,
++    // NBrowser: independent of ITEM_GROUP_PARTIAL_TRANSLATE, which is tied to
++    // the legacy, network-based components/translate pipeline (disabled in
++    // this fork) - gates the local, on-device Quick Translate row instead.
++    ITEM_GROUP_QUICK_TRANSLATE,
+     ITEM_GROUP_SEARCH_PROVIDER,
+     ITEM_GROUP_PRINT,
+     ITEM_GROUP_ALL_EXTENSION,

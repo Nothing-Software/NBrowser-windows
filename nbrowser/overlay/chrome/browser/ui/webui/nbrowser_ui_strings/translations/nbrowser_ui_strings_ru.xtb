@@ -1,18 +1,27 @@
 <?xml version="1.0" ?>
 <!DOCTYPE translationbundle>
 <translationbundle lang="ru">
+<translation id="82095122704156206">Перевод для этого языка недоступен</translation>
 <translation id="259939095371044506">Дополнительный цвет</translation>
 <translation id="473775607612524610">Обновить</translation>
 <translation id="1146903979901528862">Если выключено, перед установкой каждого обновления будет запрашиваться подтверждение.</translation>
 <translation id="1684279041537802716">Акцентный цвет</translation>
 <translation id="2707021329343209294">Сохранённый цвет</translation>
+<translation id="3289713916904788004">Уже на этом языке</translation>
 <translation id="3391031795074996627">Не удалось скачать обновление. Попробуйте позже.</translation>
 <translation id="3460332313611173557">Введите корректный HEX-код цвета, например #000000</translation>
 <translation id="3806969146385418392">Разрешить NBrowser обновляться автоматически</translation>
+<translation id="4268723942931471764">Подготовка перевода…</translation>
 <translation id="4277430129575371624">Основной цвет</translation>
+<translation id="4545068268969559332">При возможности использует API Google для повышения качества (передаёт данные Google)</translation>
+<translation id="4809254154964348864">Использовать онлайн-модель для «Быстрого перевода»</translation>
 <translation id="5558616452704772882">Свои цвета</translation>
+<translation id="5646463141987522940">Перевод недоступен</translation>
 <translation id="5949853856690357931">Доступна новая версия NBrowser. Чтобы установить её, найдите уведомление в верхней части окна.</translation>
+<translation id="7048252346193986262">Быстрый перевод</translation>
 <translation id="7233421021020136469">Удалить сохранённый цвет</translation>
+<translation id="7451548400940112082">Не требует сетевого соединения — используется локальная языковая модель</translation>
+<translation id="8407006308669794450">Использовать «Быстрый перевод»</translation>
 <translation id="8501436326098077818">Доступна новая версия NBrowser.</translation>
 <translation id="8835511040431265190">Сохранить пресет</translation>
 </translationbundle>

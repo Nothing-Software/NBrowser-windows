@@ -1,0 +1,69 @@
+diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
+--- a/chrome/browser/prefs/browser_prefs.cc
++++ b/chrome/browser/prefs/browser_prefs.cc
+@@ -76,6 +76,7 @@
+ #include "chrome/browser/push_messaging/push_messaging_app_identifier.h"
+ #include "chrome/browser/push_messaging/push_messaging_service_impl.h"
+ #include "chrome/browser/push_messaging/push_messaging_unsubscribed_entry.h"
++#include "chrome/browser/quick_translate/quick_translate_prefs.h"
+ #include "chrome/browser/rlz/chrome_rlz_tracker_delegate.h"
+ #include "chrome/browser/search/background/ntp_custom_background_service.h"
+ #include "chrome/browser/search/search.h"
+@@ -1825,6 +1837,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
+   custom_handlers::ProtocolHandlerRegistry::RegisterProfilePrefs(registry);
+   PushMessagingAppIdentifier::RegisterProfilePrefs(registry);
+   PushMessagingUnsubscribedEntry::RegisterProfilePrefs(registry);
++  quick_translate::prefs::RegisterProfilePrefs(registry);
+   QuietNotificationPermissionUiState::RegisterProfilePrefs(registry);
+   regional_capabilities::prefs::RegisterProfilePrefs(registry);
+   RegisterBrowserUserPrefs(registry);
+diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn
+--- a/chrome/browser/prefs/BUILD.gn
++++ b/chrome/browser/prefs/BUILD.gn
+@@ -103,6 +103,7 @@ source_set("impl") {
+     "//chrome/browser/profiles:profile_util",
+     "//chrome/browser/push_messaging",
+     "//chrome/browser/push_messaging:service_impl_public",
++    "//chrome/browser/quick_translate",
+     "//chrome/browser/search",
+     "//chrome/browser/search/background",
+     "//chrome/browser/serial",
+diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+--- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
++++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+@@ -1448,6 +1421,14 @@ void AddLanguagesStrings(content::WebUIDataSource* html_source,
+        IDS_SETTINGS_LANGUAGES_OFFER_TO_ENABLE_TRANSLATE},
+       {"offerToEnableTranslateSublabel",
+        IDS_SETTINGS_LANGUAGES_OFFER_TO_ENABLE_TRANSLATE_SUBLABEL},
++      // NBrowser: Quick Translate toggles (chrome/browser/quick_translate/).
++      {"quickTranslateEnabledLabel", IDS_QUICK_TRANSLATE_SETTINGS_ENABLED_LABEL},
++      {"quickTranslateEnabledSublabel",
++       IDS_QUICK_TRANSLATE_SETTINGS_ENABLED_SUBLABEL},
++      {"quickTranslateUseOnlineModelLabel",
++       IDS_QUICK_TRANSLATE_SETTINGS_USE_ONLINE_MODEL_LABEL},
++      {"quickTranslateUseOnlineModelSublabel",
++       IDS_QUICK_TRANSLATE_SETTINGS_USE_ONLINE_MODEL_SUBLABEL},
+       {"noLanguagesAdded", IDS_SETTINGS_LANGUAGES_NO_LANGUAGES_ADDED},
+       {"addLanguageAriaLabel", IDS_SETTINGS_LANGUAGES_ADD_ARIA_LABEL},
+       {"removeAutomaticLanguageAriaLabel",
+diff --git a/chrome/browser/resources/settings/languages_page/translate_page.html b/chrome/browser/resources/settings/languages_page/translate_page.html
+index 47ee2c73fc..44cf5d92bd 100644
+--- a/chrome/browser/resources/settings/languages_page/translate_page.html
++++ b/chrome/browser/resources/settings/languages_page/translate_page.html
+@@ -6,6 +6,16 @@
+     sub-label="$i18n{offerToEnableTranslateSublabel}"
+     on-settings-boolean-control-change="onTranslateToggleChange_">
+ </settings-toggle-button>
++<settings-toggle-button id="quickTranslateEnabled"
++    pref="{{prefs.quick_translate.enabled}}"
++    label="$i18n{quickTranslateEnabledLabel}"
++    sub-label="$i18n{quickTranslateEnabledSublabel}">
++</settings-toggle-button>
++<settings-toggle-button id="quickTranslateUseOnlineModel"
++    pref="{{prefs.quick_translate.use_online_model}}"
++    label="$i18n{quickTranslateUseOnlineModelLabel}"
++    sub-label="$i18n{quickTranslateUseOnlineModelSublabel}">
++</settings-toggle-button>
+ <cr-collapse opened="[[prefs.translate.enabled.value]]">
+   <div class="cr-row continuation">
+     <div id="targetLanguageLabel" class="flex cr-padded-text"
