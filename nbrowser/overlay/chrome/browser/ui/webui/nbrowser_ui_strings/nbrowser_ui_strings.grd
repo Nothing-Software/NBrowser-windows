@@ -180,11 +180,20 @@
         No connection
       </message>
 
-      <!-- Quick Translate settings toggles, chrome://settings/languages under the Translator section (chrome/browser/resources/settings/languages_page/translate_page.html, chrome/browser/quick_translate/quick_translate_prefs.h). -->
-      <message name="IDS_QUICK_TRANSLATE_SETTINGS_ENABLED_LABEL" desc="Label for the settings toggle that turns the local Quick Translate context-menu feature on or off.">
+      <!-- Quick Translate settings block, chrome://settings/languages between the Spell check and Translate cards (chrome/browser/resources/settings/languages_page/translate_page.html, chrome/browser/quick_translate/quick_translate_prefs.h). -->
+      <message name="IDS_QUICK_TRANSLATE_PAGE_TITLE" desc="Title of the standalone Quick Translate settings card on chrome://settings/languages, positioned between the Spell check and Translate cards.">
+        Quick Translate
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_ENABLED_LABEL" desc="Label for the master settings toggle that turns the whole Quick Translate context-menu feature on or off; the two model-choice toggles below it are only enabled when this is on.">
         Use Quick Translate
       </message>
-      <message name="IDS_QUICK_TRANSLATE_SETTINGS_ENABLED_SUBLABEL" desc="Sub-label under the Quick Translate settings toggle, explaining it runs fully on-device and which language pair the bundled model covers.">
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_ENABLED_SUBLABEL" desc="Sub-label under the master Quick Translate settings toggle, describing the feature in general terms (the specific offline/online model choice has its own toggles below).">
+        Show a quick translation of selected text in the right-click menu
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_USE_OFFLINE_MODEL_LABEL" desc="Label for the settings toggle that lets Quick Translate use the on-device engine, one of the two model-choice toggles under the master Quick Translate toggle.">
+        Use offline model for Quick Translate
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_USE_OFFLINE_MODEL_SUBLABEL" desc="Sub-label under the offline-model settings toggle, explaining it runs fully on-device and which language pair the bundled model covers.">
         Doesn't require an internet connection - uses a local language model (English to Russian only)
       </message>
       <message name="IDS_QUICK_TRANSLATE_SETTINGS_USE_ONLINE_MODEL_LABEL" desc="Label for the settings toggle that lets Quick Translate try Google's online translation API first, before falling back to the local engine.">

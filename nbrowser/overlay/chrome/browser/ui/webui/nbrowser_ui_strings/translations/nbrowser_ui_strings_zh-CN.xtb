@@ -4,6 +4,7 @@
 <translation id="82095122704156206">此语言不支持翻译</translation>
 <translation id="259939095371044506">辅助色</translation>
 <translation id="473775607612524610">更新</translation>
+<translation id="927148020748822268">在右键菜单中显示所选文本的快速翻译</translation>
 <translation id="1146903979901528862">关闭时，每次安装更新前都会先询问您。</translation>
 <translation id="1684279041537802716">强调色</translation>
 <translation id="2707021329343209294">已保存的颜色</translation>
@@ -13,12 +14,14 @@
 <translation id="3806969146385418392">允许 NBrowser 自动更新</translation>
 <translation id="4268723942931471764">正在准备翻译…</translation>
 <translation id="4277430129575371624">主色</translation>
+<translation id="4437317078690941999">为快速翻译使用离线模型</translation>
 <translation id="4545068268969559332">在可用时使用 Google API 以提高质量（会向 Google 发送数据）</translation>
 <translation id="4561979708150884304">无连接</translation>
 <translation id="4809254154964348864">为快速翻译使用在线模型</translation>
 <translation id="5558616452704772882">自定义颜色</translation>
 <translation id="5646463141987522940">翻译不可用</translation>
 <translation id="5949853856690357931">有新版本的 NBrowser 可用。请在窗口顶部查找通知以完成安装。</translation>
+<translation id="7048252346193986262">快速翻译</translation>
 <translation id="7233421021020136469">删除已保存的颜色</translation>
 <translation id="7246080024352717094">无需网络连接 — 使用本地语言模型（仅支持英语-俄语）</translation>
 <translation id="8407006308669794450">使用快速翻译</translation>

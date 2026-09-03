@@ -4,6 +4,7 @@
 <translation id="82095122704156206">La traducción no está disponible para este idioma</translation>
 <translation id="259939095371044506">Color secundario</translation>
 <translation id="473775607612524610">Actualizar</translation>
+<translation id="927148020748822268">Muestra una traducción rápida del texto seleccionado en el menú contextual</translation>
 <translation id="1146903979901528862">Si está desactivado, se te preguntará antes de instalar cada actualización.</translation>
 <translation id="1684279041537802716">Color de acento</translation>
 <translation id="2707021329343209294">Color guardado</translation>
@@ -13,12 +14,14 @@
 <translation id="3806969146385418392">Permitir que NBrowser se actualice automáticamente</translation>
 <translation id="4268723942931471764">Preparando la traducción…</translation>
 <translation id="4277430129575371624">Color principal</translation>
+<translation id="4437317078690941999">Usar un modelo sin conexión para la Traducción rápida</translation>
 <translation id="4545068268969559332">Usa la API de Google cuando está disponible para mejorar la calidad (envía datos a Google)</translation>
 <translation id="4561979708150884304">Sin conexión</translation>
 <translation id="4809254154964348864">Usar un modelo en línea para la Traducción rápida</translation>
 <translation id="5558616452704772882">Colores personalizados</translation>
 <translation id="5646463141987522940">Traducción no disponible</translation>
 <translation id="5949853856690357931">Hay una nueva versión de NBrowser disponible. Busca la notificación en la parte superior de la ventana para instalarla.</translation>
+<translation id="7048252346193986262">Traducción rápida</translation>
 <translation id="7233421021020136469">Quitar color guardado</translation>
 <translation id="7246080024352717094">No requiere conexión a internet: usa un modelo de idioma local (solo inglés-ruso)</translation>
 <translation id="8407006308669794450">Usar Traducción rápida</translation>

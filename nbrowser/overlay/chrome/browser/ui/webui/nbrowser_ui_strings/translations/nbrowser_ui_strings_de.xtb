@@ -4,6 +4,7 @@
 <translation id="82095122704156206">Übersetzung für diese Sprache nicht verfügbar</translation>
 <translation id="259939095371044506">Sekundärfarbe</translation>
 <translation id="473775607612524610">Aktualisieren</translation>
+<translation id="927148020748822268">Zeigt eine schnelle Übersetzung des ausgewählten Texts im Kontextmenü an</translation>
 <translation id="1146903979901528862">Wenn deaktiviert, werden Sie vor jeder Update-Installation gefragt.</translation>
 <translation id="1684279041537802716">Akzentfarbe</translation>
 <translation id="2707021329343209294">Gespeicherte Farbe</translation>
@@ -13,12 +14,14 @@
 <translation id="3806969146385418392">NBrowser automatisch aktualisieren lassen</translation>
 <translation id="4268723942931471764">Übersetzung wird vorbereitet…</translation>
 <translation id="4277430129575371624">Primärfarbe</translation>
+<translation id="4437317078690941999">Offline-Modell für Schnellübersetzung verwenden</translation>
 <translation id="4545068268969559332">Verwendet bei Verfügbarkeit die Google-API zur Qualitätsverbesserung (sendet Daten an Google)</translation>
 <translation id="4561979708150884304">Keine Verbindung</translation>
 <translation id="4809254154964348864">Online-Modell für Schnellübersetzung verwenden</translation>
 <translation id="5558616452704772882">Personalisierte Farben</translation>
 <translation id="5646463141987522940">Übersetzung nicht verfügbar</translation>
 <translation id="5949853856690357931">Eine neue Version von NBrowser ist verfügbar. Suchen Sie oben im Fenster nach der Benachrichtigung, um sie zu installieren.</translation>
+<translation id="7048252346193986262">Schnellübersetzung</translation>
 <translation id="7233421021020136469">Gespeicherte Farbe entfernen</translation>
 <translation id="7246080024352717094">Erfordert keine Internetverbindung – verwendet ein lokales Sprachmodell (nur Englisch-Russisch)</translation>
 <translation id="8407006308669794450">Schnellübersetzung verwenden</translation>
