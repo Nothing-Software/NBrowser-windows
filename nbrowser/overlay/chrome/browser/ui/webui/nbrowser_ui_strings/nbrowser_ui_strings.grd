@@ -162,6 +162,46 @@
       <message name="IDS_NBROWSER_UPDATE_AUTO_INSTALL_TOGGLE_SUB_LABEL" desc="Sub-label under the auto-update toggle on chrome://settings/help, explaining what turning it off does.">
         When off, you'll be asked before each update is installed.
       </message>
+
+      <!-- Quick Translate context-menu preview row (chrome/browser/quick_translate/, chrome/browser/ui/views/renderer_context_menu/quick_translate_menu_view.h). No <ph> placeholders on purpose, same reason as the update infobar strings above - dynamic language names/translated text are composed directly in C++, not via message substitution. -->
+      <message name="IDS_QUICK_TRANSLATE_PREPARING" desc="Status text shown in the Quick Translate context-menu row while the local translation engine is starting up.">
+        Preparing translation…
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_UNAVAILABLE" desc="Status text shown in the Quick Translate context-menu row when translation failed for an unspecified reason.">
+        Translation unavailable
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_UNSUPPORTED_LANGUAGE" desc="Status text shown in the Quick Translate context-menu row when the detected or target language isn't supported by the local engine.">
+        Translation not available for this language
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_ALREADY_TRANSLATED" desc="Status text shown in the Quick Translate context-menu row when the selected text is already in the user's configured target language.">
+        Already in this language
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_NO_CONNECTION" desc="Status text shown in the Quick Translate context-menu row when the online model is enabled but unreachable and the local engine can't cover the needed language pair either.">
+        No connection
+      </message>
+
+      <!-- Quick Translate settings block, chrome://settings/languages between the Spell check and Translate cards (chrome/browser/resources/settings/languages_page/translate_page.html, chrome/browser/quick_translate/quick_translate_prefs.h). -->
+      <message name="IDS_QUICK_TRANSLATE_PAGE_TITLE" desc="Title of the standalone Quick Translate settings card on chrome://settings/languages, positioned between the Spell check and Translate cards.">
+        Quick Translate
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_ENABLED_LABEL" desc="Label for the master settings toggle that turns the whole Quick Translate context-menu feature on or off; the two model-choice toggles below it are only enabled when this is on.">
+        Use Quick Translate
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_ENABLED_SUBLABEL" desc="Sub-label under the master Quick Translate settings toggle, describing the feature in general terms (the specific offline/online model choice has its own toggles below).">
+        Show a quick translation of selected text in the right-click menu
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_USE_OFFLINE_MODEL_LABEL" desc="Label for the settings toggle that lets Quick Translate use the on-device engine, one of the two model-choice toggles under the master Quick Translate toggle.">
+        Use offline model for Quick Translate
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_USE_OFFLINE_MODEL_SUBLABEL" desc="Sub-label under the offline-model settings toggle, explaining it runs fully on-device and which language pair the bundled model covers.">
+        Doesn't require an internet connection - uses a local language model (English to Russian only)
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_USE_ONLINE_MODEL_LABEL" desc="Label for the settings toggle that lets Quick Translate try Google's online translation API first, before falling back to the local engine.">
+        Use an online model for Quick Translate
+      </message>
+      <message name="IDS_QUICK_TRANSLATE_SETTINGS_USE_ONLINE_MODEL_SUBLABEL" desc="Sub-label under the online-model settings toggle, disclosing that it sends data to Google. 'when available' also covers the automatic fallback to the local engine when the online API is unreachable.">
+        Uses Google's API when available to improve quality (sends data to Google)
+      </message>
     </messages>
   </release>
 </grit>

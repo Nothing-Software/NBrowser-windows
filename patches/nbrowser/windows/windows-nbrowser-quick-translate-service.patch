@@ -1,0 +1,1313 @@
+diff --git a/chrome/browser/quick_translate/BUILD.gn b/chrome/browser/quick_translate/BUILD.gn
+new file mode 100644
+index 0000000000..662a4c1c78
+--- /dev/null
++++ b/chrome/browser/quick_translate/BUILD.gn
+@@ -0,0 +1,64 @@
++# Copyright 2026 The NBrowser Authors
++# Use of this source code is governed by a BSD-style license that can be
++# found in the LICENSE file.
++
++import("//components/on_device_translation/buildflags/features.gni")
++
++assert(enable_on_device_translation)
++
++# Split out of :quick_translate so that code outside this feature (e.g.
++# chrome/browser/extensions/api/settings_private, which needs the pref
++# names for its settingsPrivate allowlist) can depend on just the pref
++# names without pulling in the full feature - :quick_translate transitively
++# depends on //chrome/browser/on_device_translation, which itself
++# transitively depends back on //chrome/browser/extensions, so a direct
++# extensions -> quick_translate dependency is a GN dependency cycle.
++source_set("prefs") {
++  sources = [
++    "quick_translate_prefs.cc",
++    "quick_translate_prefs.h",
++  ]
++  deps = [ "//components/pref_registry" ]
++  configs += [ "//build/config/compiler:wexit_time_destructors" ]
++}
++
++source_set("quick_translate") {
++  sources = [
++    "fallback_quick_translate_provider.cc",
++    "fallback_quick_translate_provider.h",
++    "local_quick_translate_provider.cc",
++    "local_quick_translate_provider.h",
++    "quick_translate_provider.h",
++    "quick_translate_request.cc",
++    "quick_translate_request.h",
++    "quick_translate_service.cc",
++    "quick_translate_service.h",
++    "quick_translate_service_factory.cc",
++    "quick_translate_service_factory.h",
++    "remote_quick_translate_provider.cc",
++    "remote_quick_translate_provider.h",
++  ]
++  public_deps = [
++    "//chrome/browser:browser_public_dependencies",
++    "//components/on_device_translation:public",
++  ]
++  deps = [
++    ":prefs",
++    "//base",
++    "//chrome/browser/language",
++    "//chrome/browser/language_detection",
++    "//chrome/browser/on_device_translation",
++    "//chrome/browser/translate",
++    "//components/keyed_service/content",
++    "//components/language/core/browser",
++    "//components/language_detection/core",
++    "//components/on_device_translation/public/mojom",
++    "//components/prefs",
++    "//components/translate/core/browser",
++    "//mojo/public/cpp/bindings",
++    "//net",
++    "//services/network/public/cpp",
++    "//url",
++  ]
++  configs += [ "//build/config/compiler:wexit_time_destructors" ]
++}
+diff --git a/chrome/browser/quick_translate/fallback_quick_translate_provider.cc b/chrome/browser/quick_translate/fallback_quick_translate_provider.cc
+new file mode 100644
+index 0000000000..cdffd4f90a
+--- /dev/null
++++ b/chrome/browser/quick_translate/fallback_quick_translate_provider.cc
+@@ -0,0 +1,127 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/quick_translate/fallback_quick_translate_provider.h"
++
++#include <utility>
++
++#include "base/functional/bind.h"
++#include "base/time/time.h"
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/quick_translate/quick_translate_prefs.h"
++#include "components/prefs/pref_service.h"
++
++namespace quick_translate {
++
++namespace {
++constexpr base::TimeDelta kOnlineCooldown = base::Minutes(5);
++}  // namespace
++
++FallbackQuickTranslateProvider::FallbackQuickTranslateProvider(
++    Profile* profile)
++    : profile_(profile), local_(profile), remote_(profile) {}
++
++FallbackQuickTranslateProvider::~FallbackQuickTranslateProvider() = default;
++
++bool FallbackQuickTranslateProvider::IsReady() const {
++  return local_.IsReady();
++}
++
++void FallbackQuickTranslateProvider::Translate(const std::u16string& text,
++                                               ResultCallback callback) {
++  PrefService* pref_service = profile_->GetPrefs();
++  const bool offline_enabled =
++      pref_service->GetBoolean(prefs::kQuickTranslateUseOfflineModel);
++  const bool online_enabled =
++      pref_service->GetBoolean(prefs::kQuickTranslateUseOnlineModel);
++
++  if (!offline_enabled && !online_enabled) {
++    Result result;
++    result.status = Status::kError;
++    std::move(callback).Run(std::move(result));
++    return;
++  }
++
++  if (online_enabled && !InOnlineCooldown()) {
++    remote_.Translate(
++        text, local_.GetTargetLanguage(),
++        base::BindOnce(&FallbackQuickTranslateProvider::OnRemoteResult,
++                       weak_ptr_factory_.GetWeakPtr(), text, offline_enabled,
++                       std::move(callback)));
++    return;
++  }
++
++  if (offline_enabled) {
++    if (online_enabled) {
++      // Online is wanted but cooling down after a recent failure - route
++      // through the same "local can't cover this pair" -> kNoConnection
++      // remap a live failure would, since the underlying reason is the same.
++      TranslateLocallyAsFallback(text, std::move(callback));
++    } else {
++      local_.Translate(text, std::move(callback));
++    }
++    return;
++  }
++
++  // Online is wanted but cooling down, and offline is disabled - nothing
++  // usable right now.
++  Result result;
++  result.status = Status::kNoConnection;
++  std::move(callback).Run(std::move(result));
++}
++
++bool FallbackQuickTranslateProvider::InOnlineCooldown() const {
++  return remote_cooldown_until_ &&
++        base::TimeTicks::Now() < *remote_cooldown_until_;
++}
++
++void FallbackQuickTranslateProvider::TranslateLocallyAsFallback(
++    const std::u16string& text,
++    ResultCallback callback) {
++  local_.Translate(
++      text, base::BindOnce(
++                &FallbackQuickTranslateProvider::OnLocalFallbackResult,
++                weak_ptr_factory_.GetWeakPtr(), std::move(callback)));
++}
++
++void FallbackQuickTranslateProvider::OnRemoteResult(std::u16string text,
++                                                    bool offline_enabled,
++                                                    ResultCallback callback,
++                                                    Result result) {
++  if (result.status != Status::kError) {
++    std::move(callback).Run(std::move(result));
++    return;
++  }
++
++  // Most commonly means "no network" - stop trying the remote provider for
++  // a while rather than paying for another doomed round-trip on every
++  // translation until then.
++  remote_cooldown_until_ = base::TimeTicks::Now() + kOnlineCooldown;
++
++  if (offline_enabled) {
++    TranslateLocallyAsFallback(text, std::move(callback));
++    return;
++  }
++
++  // Offline is disabled, so there is no fallback to try.
++  Result out;
++  out.status = Status::kNoConnection;
++  std::move(callback).Run(std::move(out));
++}
++
++void FallbackQuickTranslateProvider::OnLocalFallbackResult(
++    ResultCallback callback,
++    Result result) {
++  // The local engine only covers en<->ru. Reaching for the remote provider
++  // in the first place already implied that pair wasn't enough, so the
++  // local engine reporting "unsupported language" here really means the
++  // remote attempt that just failed had no local equivalent to fall back
++  // on - i.e. no connection, not a permanent limitation of this pair.
++  if (result.status == Status::kUnsupportedLanguage) {
++    result.status = Status::kNoConnection;
++  }
++  std::move(callback).Run(std::move(result));
++}
++
++}  // namespace quick_translate
+diff --git a/chrome/browser/quick_translate/fallback_quick_translate_provider.h b/chrome/browser/quick_translate/fallback_quick_translate_provider.h
+new file mode 100644
+index 0000000000..55511bde44
+--- /dev/null
++++ b/chrome/browser/quick_translate/fallback_quick_translate_provider.h
+@@ -0,0 +1,84 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_QUICK_TRANSLATE_FALLBACK_QUICK_TRANSLATE_PROVIDER_H_
++#define CHROME_BROWSER_QUICK_TRANSLATE_FALLBACK_QUICK_TRANSLATE_PROVIDER_H_
++
++#include <optional>
++#include <string>
++
++#include "base/memory/raw_ptr.h"
++#include "base/memory/weak_ptr.h"
++#include "base/time/time.h"
++#include "chrome/browser/quick_translate/local_quick_translate_provider.h"
++#include "chrome/browser/quick_translate/quick_translate_provider.h"
++#include "chrome/browser/quick_translate/remote_quick_translate_provider.h"
++
++class Profile;
++
++namespace quick_translate {
++
++// The QuickTranslateProvider QuickTranslateService actually installs.
++// Composes the two independently-toggleable engines
++// (prefs::kQuickTranslateUseOfflineModel, prefs::kQuickTranslateUseOnlineModel
++// - both surfaced as sub-toggles under the master "Use Quick Translate" one):
++// with both on, tries RemoteQuickTranslateProvider first, for its wider
++// language coverage, and falls back to the on-device engine whenever the
++// remote attempt fails - most commonly, no network connection. With only one
++// on, that engine is used directly and the other is never invoked, even as a
++// fallback - an explicitly disabled engine stays disabled. With neither on,
++// Translate() fails immediately without attempting anything.
++//
++// A failed remote attempt disables further remote attempts for
++// kOnlineCooldown, so that an offline user doesn't pay for (and wait out) a
++// doomed network round-trip on every single translation.
++class FallbackQuickTranslateProvider : public QuickTranslateProvider {
++ public:
++  explicit FallbackQuickTranslateProvider(Profile* profile);
++  ~FallbackQuickTranslateProvider() override;
++
++  FallbackQuickTranslateProvider(const FallbackQuickTranslateProvider&) =
++      delete;
++  FallbackQuickTranslateProvider& operator=(
++      const FallbackQuickTranslateProvider&) = delete;
++
++  // QuickTranslateProvider:
++  void Translate(const std::u16string& text,
++                 ResultCallback callback) override;
++  bool IsReady() const override;
++
++ private:
++  bool InOnlineCooldown() const;
++
++  // Routes through OnLocalFallbackResult so a language the local engine
++  // can't cover is reported as kNoConnection rather than
++  // kUnsupportedLanguage - correct here because online was wanted (either
++  // it was just tried and failed, or it's being skipped for
++  // InOnlineCooldown()), so "local can't do this pair" really does mean
++  // "the online model that could have is currently unavailable".
++  void TranslateLocallyAsFallback(const std::u16string& text,
++                                  ResultCallback callback);
++
++  void OnRemoteResult(std::u16string text,
++                      bool offline_enabled,
++                      ResultCallback callback,
++                      Result result);
++  void OnLocalFallbackResult(ResultCallback callback, Result result);
++
++  raw_ptr<Profile> profile_;
++  LocalQuickTranslateProvider local_;
++  RemoteQuickTranslateProvider remote_;
++
++  // Unset until the first remote failure - see the class comment for why
++  // remote attempts are throttled after a failure rather than retried on
++  // every translation.
++  std::optional<base::TimeTicks> remote_cooldown_until_;
++
++  base::WeakPtrFactory<FallbackQuickTranslateProvider> weak_ptr_factory_{
++      this};
++};
++
++}  // namespace quick_translate
++
++#endif  // CHROME_BROWSER_QUICK_TRANSLATE_FALLBACK_QUICK_TRANSLATE_PROVIDER_H_
+diff --git a/chrome/browser/quick_translate/local_quick_translate_provider.cc b/chrome/browser/quick_translate/local_quick_translate_provider.cc
+new file mode 100644
+index 0000000000..9bc13da448
+--- /dev/null
++++ b/chrome/browser/quick_translate/local_quick_translate_provider.cc
+@@ -0,0 +1,210 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/quick_translate/local_quick_translate_provider.h"
++
++#include <utility>
++
++#include "base/command_line.h"
++#include "base/functional/bind.h"
++#include "base/logging.h"
++#include "base/no_destructor.h"
++#include "base/strings/utf_string_conversions.h"
++#include "chrome/browser/language/language_model_manager_factory.h"
++#include "chrome/browser/language_detection/language_detection_model_service_factory.h"
++#include "components/language/core/browser/language_model_manager.h"
++#include "chrome/browser/on_device_translation/service_controller_manager_factory.h"
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/translate/chrome_translate_client.h"
++#include "components/language_detection/core/language_detection_model.h"
++#include "components/language_detection/core/language_detection_provider.h"
++#include "components/on_device_translation/features.h"
++#include "components/on_device_translation/public/mojom/translator.mojom.h"
++#include "components/on_device_translation/service_controller_manager.h"
++#include "components/translate/core/browser/translate_manager.h"
++#include "components/translate/core/browser/translate_prefs.h"
++#include "url/gurl.h"
++#include "url/origin.h"
++
++namespace quick_translate {
++
++namespace {
++
++// Used only as a cache key into ServiceControllerManager's per-origin LRU of
++// translators (and for its content-setting storage) - it is not tied to any
++// real site, so a single stable value keeps the translator cache warm across
++// every page the user quick-translates from, rather than thrashing one entry
++// per visited origin. See components/on_device_translation/
++// service_controller_manager.h.
++const url::Origin& QuickTranslateOrigin() {
++  static const base::NoDestructor<url::Origin> origin(
++      url::Origin::Create(GURL("chrome://quick-translate")));
++  return *origin;
++}
++
++}  // namespace
++
++LocalQuickTranslateProvider::LocalQuickTranslateProvider(Profile* profile)
++    : profile_(profile) {}
++
++LocalQuickTranslateProvider::~LocalQuickTranslateProvider() = default;
++
++bool LocalQuickTranslateProvider::IsReady() const {
++  // Reflects whether the local TranslateKit engine/language packs bundled
++  // with this install were wired up (see the NBrowser addition to
++  // ChromeMainDelegate::BasicStartupComplete() in chrome_main_delegate.cc) -
++  // component-updater-based auto-download is unconditionally disabled by
++  // ungoogled-chromium's block-requests.patch, so this switch is the only
++  // way the engine ever becomes available.
++  return base::CommandLine::ForCurrentProcess()->HasSwitch(
++      on_device_translation::kTranslateKitBinaryPath);
++}
++
++std::string LocalQuickTranslateProvider::GetTargetLanguage() const {
++  std::unique_ptr<translate::TranslatePrefs> translate_prefs =
++      ChromeTranslateClient::CreateTranslatePrefs(profile_->GetPrefs());
++  language::LanguageModel* language_model =
++      LanguageModelManagerFactory::GetForBrowserContext(profile_)
++          ->GetPrimaryModel();
++  return translate::TranslateManager::GetTargetLanguage(translate_prefs.get(),
++                                                        language_model);
++}
++
++void LocalQuickTranslateProvider::Translate(const std::u16string& text,
++                                            ResultCallback callback) {
++  EnsureLanguageDetectionModelReady(base::BindOnce(
++      &LocalQuickTranslateProvider::ContinueTranslate,
++      weak_ptr_factory_.GetWeakPtr(), text, std::move(callback)));
++}
++
++void LocalQuickTranslateProvider::EnsureLanguageDetectionModelReady(
++    base::OnceClosure done) {
++  if (language_detection::GetLanguageDetectionModel().IsAvailable()) {
++    std::move(done).Run();
++    return;
++  }
++  // The process-wide singleton above is never populated on its own in the
++  // browser process - only a renderer normally requests and loads it (for
++  // the legacy translate pipeline's own detection). Request it explicitly
++  // via the service that already holds it (fed by the
++  // --optimization-guide-model-override bundled model, see
++  // chrome_main_delegate.cc) and load it into that singleton ourselves.
++  auto* service =
++      LanguageDetectionModelServiceFactory::GetForProfile(profile_);
++  if (!service) {
++    LOG(WARNING) << "Quick Translate: no LanguageDetectionModelService for "
++                    "this profile - source language will be undetected.";
++    std::move(done).Run();
++    return;
++  }
++  service->GetLanguageDetectionModelFile(base::BindOnce(
++      &LocalQuickTranslateProvider::OnLanguageDetectionModelFile,
++      weak_ptr_factory_.GetWeakPtr(), std::move(done)));
++}
++
++void LocalQuickTranslateProvider::OnLanguageDetectionModelFile(
++    base::OnceClosure done,
++    base::File file) {
++  if (!file.IsValid()) {
++    LOG(WARNING) << "Quick Translate: language detection model file is not "
++                    "valid - source language will be undetected. Check "
++                    "--optimization-guide-model-override.";
++    std::move(done).Run();
++    return;
++  }
++  language_detection::GetLanguageDetectionModel().UpdateWithFileAsync(
++      std::move(file), std::move(done));
++}
++
++void LocalQuickTranslateProvider::ContinueTranslate(std::u16string text,
++                                                    ResultCallback callback) {
++  std::string source_lang;
++  language_detection::LanguageDetectionModel& model =
++      language_detection::GetLanguageDetectionModel();
++  if (model.IsAvailable()) {
++    source_lang = model.PredictTopLanguageWithSamples(text).language;
++  }
++
++  std::string target_lang = GetTargetLanguage();
++
++  if (!source_lang.empty() && source_lang == target_lang) {
++    Result result;
++    result.status = Status::kSameLanguage;
++    result.source_language = source_lang;
++    result.target_language = target_lang;
++    std::move(callback).Run(std::move(result));
++    return;
++  }
++
++  if (!IsReady()) {
++    Result result;
++    result.status = Status::kNotReady;
++    result.source_language = source_lang;
++    result.target_language = target_lang;
++    std::move(callback).Run(std::move(result));
++    return;
++  }
++
++  on_device_translation::ServiceControllerManagerFactory::GetInstance()
++      ->Get(profile_)
++      ->CreateTranslator(
++          QuickTranslateOrigin(), source_lang, target_lang,
++          base::BindOnce(&LocalQuickTranslateProvider::OnTranslatorCreated,
++                         weak_ptr_factory_.GetWeakPtr(), source_lang,
++                         target_lang, text, std::move(callback)));
++}
++
++void LocalQuickTranslateProvider::OnTranslatorCreated(
++    std::string source_lang,
++    std::string target_lang,
++    std::u16string text,
++    ResultCallback callback,
++    base::expected<mojo::PendingRemote<OnDeviceTranslator>,
++                   CreateTranslatorError> result) {
++  if (!result.has_value()) {
++    LOG(WARNING) << "Quick Translate: CreateTranslator(" << source_lang
++                 << " -> " << target_lang
++                 << ") failed, error=" << static_cast<int>(result.error());
++    Result out;
++    out.source_language = source_lang;
++    out.target_language = target_lang;
++    out.status = result.error() == CreateTranslatorError::kNotSupportedLanguage
++                    ? Status::kUnsupportedLanguage
++                    : Status::kError;
++    std::move(callback).Run(std::move(out));
++    return;
++  }
++
++  // The mojo::Remote must outlive the Translate() call - keep it alive by
++  // handing ownership to its own response callback, which destroys it once
++  // the translation completes (or drops it harmlessly if `this` is gone).
++  auto remote =
++      std::make_unique<mojo::Remote<OnDeviceTranslator>>(std::move(*result));
++  mojo::Remote<OnDeviceTranslator>* raw_remote = remote.get();
++  (*raw_remote)->Translate(
++      base::UTF16ToUTF8(text),
++      base::BindOnce(&LocalQuickTranslateProvider::OnTranslated,
++                     weak_ptr_factory_.GetWeakPtr(), std::move(remote),
++                     source_lang, target_lang, std::move(callback)));
++}
++
++void LocalQuickTranslateProvider::OnTranslated(
++    std::unique_ptr<mojo::Remote<OnDeviceTranslator>> translator,
++    std::string source_lang,
++    std::string target_lang,
++    ResultCallback callback,
++    const std::optional<std::string>& output) {
++  Result result;
++  result.source_language = source_lang;
++  result.target_language = target_lang;
++  if (output.has_value()) {
++    result.status = Status::kOk;
++    result.translated_text = base::UTF8ToUTF16(*output);
++  } else {
++    result.status = Status::kError;
++  }
++  std::move(callback).Run(std::move(result));
++}
++
++}  // namespace quick_translate
+diff --git a/chrome/browser/quick_translate/local_quick_translate_provider.h b/chrome/browser/quick_translate/local_quick_translate_provider.h
+new file mode 100644
+index 0000000000..4ff4d8186d
+--- /dev/null
++++ b/chrome/browser/quick_translate/local_quick_translate_provider.h
+@@ -0,0 +1,100 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_QUICK_TRANSLATE_LOCAL_QUICK_TRANSLATE_PROVIDER_H_
++#define CHROME_BROWSER_QUICK_TRANSLATE_LOCAL_QUICK_TRANSLATE_PROVIDER_H_
++
++#include <optional>
++#include <string>
++
++#include "base/files/file.h"
++#include "base/functional/callback.h"
++#include "base/memory/raw_ptr.h"
++#include "base/memory/weak_ptr.h"
++#include "base/types/expected.h"
++#include "chrome/browser/quick_translate/quick_translate_provider.h"
++#include "components/on_device_translation/service_controller.h"
++#include "mojo/public/cpp/bindings/pending_remote.h"
++#include "mojo/public/cpp/bindings/remote.h"
++
++class Profile;
++
++namespace on_device_translation {
++namespace mojom {
++class OnDeviceTranslator;
++}  // namespace mojom
++}  // namespace on_device_translation
++
++namespace quick_translate {
++
++// Translates text fully on-device via Chromium's TranslateKit engine
++// (components/on_device_translation), bypassing the legacy, network-based
++// components/translate pipeline entirely. Source-language detection also
++// runs locally (components/language_detection).
++class LocalQuickTranslateProvider : public QuickTranslateProvider {
++ public:
++  explicit LocalQuickTranslateProvider(Profile* profile);
++  ~LocalQuickTranslateProvider() override;
++
++  LocalQuickTranslateProvider(const LocalQuickTranslateProvider&) = delete;
++  LocalQuickTranslateProvider& operator=(const LocalQuickTranslateProvider&) =
++      delete;
++
++  // QuickTranslateProvider:
++  void Translate(const std::u16string& text,
++                ResultCallback callback) override;
++  bool IsReady() const override;
++
++  // The user's configured translation target language - the same value
++  // Translate() resolves internally. Exposed so
++  // FallbackQuickTranslateProvider can decide which language to request
++  // from the remote provider without duplicating this lookup.
++  //
++  // Delegates to translate::TranslateManager::GetTargetLanguage() rather
++  // than reading TranslatePrefs::GetRecentTargetLanguage() directly:
++  // "recent target" is only ever populated by an actual on-page translation
++  // via the legacy components/translate UI, which most users - especially
++  // on a profile that has never triggered it - will never have done, so
++  // reading it directly returns an empty string. TranslateManager's version
++  // falls back through the language model ranking, the browser's UI
++  // language, and the Accept-Language list before finally defaulting to
++  // "en", so it always returns a real, non-empty language code.
++  std::string GetTargetLanguage() const;
++
++ private:
++  using OnDeviceTranslator = on_device_translation::mojom::OnDeviceTranslator;
++  using CreateTranslatorError =
++      on_device_translation::OnDeviceTranslationController::
++          CreateTranslatorError;
++
++  // The process-wide language_detection::GetLanguageDetectionModel()
++  // singleton is never populated in the browser process on its own - only
++  // renderers request and load its file today (for the legacy translate
++  // pipeline). Requests it once via LanguageDetectionModelService and loads
++  // it into that singleton before continuing; a no-op if already loaded.
++  void EnsureLanguageDetectionModelReady(base::OnceClosure done);
++  void OnLanguageDetectionModelFile(base::OnceClosure done, base::File file);
++
++  void ContinueTranslate(std::u16string text, ResultCallback callback);
++
++  void OnTranslatorCreated(
++      std::string source_lang,
++      std::string target_lang,
++      std::u16string text,
++      ResultCallback callback,
++      base::expected<mojo::PendingRemote<OnDeviceTranslator>,
++                     CreateTranslatorError> result);
++  void OnTranslated(std::unique_ptr<mojo::Remote<OnDeviceTranslator>> unused,
++                    std::string source_lang,
++                    std::string target_lang,
++                    ResultCallback callback,
++                    const std::optional<std::string>& output);
++
++  raw_ptr<Profile> profile_;
++  base::WeakPtrFactory<LocalQuickTranslateProvider> weak_ptr_factory_{this};
++};
++
++}  // namespace quick_translate
++
++#endif  // CHROME_BROWSER_QUICK_TRANSLATE_LOCAL_QUICK_TRANSLATE_PROVIDER_H_
+diff --git a/chrome/browser/quick_translate/quick_translate_prefs.cc b/chrome/browser/quick_translate/quick_translate_prefs.cc
+new file mode 100644
+index 0000000000..2e9b596213
+--- /dev/null
++++ b/chrome/browser/quick_translate/quick_translate_prefs.cc
+@@ -0,0 +1,19 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/quick_translate/quick_translate_prefs.h"
++
++#include "components/pref_registry/pref_registry_syncable.h"
++
++namespace quick_translate {
++namespace prefs {
++
++void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
++  registry->RegisterBooleanPref(kQuickTranslateEnabled, true);
++  registry->RegisterBooleanPref(kQuickTranslateUseOfflineModel, true);
++  registry->RegisterBooleanPref(kQuickTranslateUseOnlineModel, false);
++}
++
++}  // namespace prefs
++}  // namespace quick_translate
+diff --git a/chrome/browser/quick_translate/quick_translate_prefs.h b/chrome/browser/quick_translate/quick_translate_prefs.h
+new file mode 100644
+index 0000000000..2f8165fefa
+--- /dev/null
++++ b/chrome/browser/quick_translate/quick_translate_prefs.h
+@@ -0,0 +1,39 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_PREFS_H_
++#define CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_PREFS_H_
++
++namespace user_prefs {
++class PrefRegistrySyncable;
++}
++
++namespace quick_translate {
++namespace prefs {
++
++// The master switch for the Quick Translate context-menu row: whether it is
++// offered at all. Surfaced as the top-level "Use Quick Translate" toggle in
++// the standalone "Quick Translate" settings card under
++// chrome://settings/languages - the two model-choice prefs below are only
++// meaningful, and only enabled in the UI, while this is on.
++inline constexpr char kQuickTranslateEnabled[] = "quick_translate.enabled";
++
++// Whether Quick Translate may use the on-device engine
++// (LocalQuickTranslateProvider). See FallbackQuickTranslateProvider, which
++// is what QuickTranslateService actually installs and reads this.
++inline constexpr char kQuickTranslateUseOfflineModel[] =
++    "quick_translate.use_offline_model";
++
++// Whether Quick Translate may use Google's online translation API
++// (RemoteQuickTranslateProvider), tried before the offline engine when both
++// are enabled. See FallbackQuickTranslateProvider.
++inline constexpr char kQuickTranslateUseOnlineModel[] =
++    "quick_translate.use_online_model";
++
++void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry);
++
++}  // namespace prefs
++}  // namespace quick_translate
++
++#endif  // CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_PREFS_H_
+diff --git a/chrome/browser/quick_translate/quick_translate_provider.h b/chrome/browser/quick_translate/quick_translate_provider.h
+new file mode 100644
+index 0000000000..35a5ba067c
+--- /dev/null
++++ b/chrome/browser/quick_translate/quick_translate_provider.h
+@@ -0,0 +1,68 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_PROVIDER_H_
++#define CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_PROVIDER_H_
++
++#include <string>
++
++#include "base/functional/callback.h"
++
++namespace quick_translate {
++
++// Backend abstraction for the "Quick Translate" context-menu feature.
++// QuickTranslateService installs a single FallbackQuickTranslateProvider,
++// which itself composes LocalQuickTranslateProvider (on-device TranslateKit)
++// and, when the user opts in, RemoteQuickTranslateProvider - see
++// fallback_quick_translate_provider.h for the selection policy between the
++// two. The context-menu/UI code only ever sees this interface.
++class QuickTranslateProvider {
++ public:
++  enum class Status {
++    // `translated_text` holds a usable translation.
++    kOk,
++    // The engine isn't available yet (e.g. the local engine's files were not
++    // bundled with this install).
++    kNotReady,
++    // The detected/requested language pair isn't supported by the provider.
++    kUnsupportedLanguage,
++    // The detected source language already matches the target language.
++    kSameLanguage,
++    // An online provider was required (the requested language pair isn't
++    // covered locally, or the user's remote attempt just failed) but no
++    // usable network connection was available.
++    kNoConnection,
++    // Translation failed for a reason not covered above.
++    kError,
++  };
++
++  struct Result {
++    Status status = Status::kError;
++    // Best-effort detected source language (BCP-47 / ISO 639-1), empty if
++    // detection was unavailable or inconclusive.
++    std::string source_language;
++    // The user's configured target language.
++    std::string target_language;
++    // Valid iff `status == Status::kOk`.
++    std::u16string translated_text;
++  };
++
++  using ResultCallback = base::OnceCallback<void(Result)>;
++
++  virtual ~QuickTranslateProvider() = default;
++
++  // Detects the source language of `text`, translates it to the user's
++  // configured target language, and invokes `callback` exactly once with the
++  // outcome.
++  virtual void Translate(const std::u16string& text,
++                         ResultCallback callback) = 0;
++
++  // Cheap, synchronous readiness check used to decide whether to show a
++  // "preparing..." placeholder before attempting a translation.
++  virtual bool IsReady() const = 0;
++};
++
++}  // namespace quick_translate
++
++#endif  // CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_PROVIDER_H_
+diff --git a/chrome/browser/quick_translate/quick_translate_request.cc b/chrome/browser/quick_translate/quick_translate_request.cc
+new file mode 100644
+index 0000000000..3b304abb2d
+--- /dev/null
++++ b/chrome/browser/quick_translate/quick_translate_request.cc
+@@ -0,0 +1,34 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/quick_translate/quick_translate_request.h"
++
++#include <utility>
++
++#include "base/functional/bind.h"
++#include "chrome/browser/quick_translate/quick_translate_service.h"
++#include "chrome/browser/quick_translate/quick_translate_service_factory.h"
++
++namespace quick_translate {
++
++QuickTranslateRequest::QuickTranslateRequest() = default;
++QuickTranslateRequest::~QuickTranslateRequest() = default;
++
++void QuickTranslateRequest::Start(Profile* profile,
++                                  const std::u16string& selection_text,
++                                  ResultCallback callback) {
++  QuickTranslateProvider* provider =
++      QuickTranslateServiceFactory::GetForProfile(profile)->GetProvider();
++  provider->Translate(
++      selection_text,
++      base::BindOnce(&QuickTranslateRequest::OnResult,
++                     weak_ptr_factory_.GetWeakPtr(), std::move(callback)));
++}
++
++void QuickTranslateRequest::OnResult(ResultCallback callback,
++                                     QuickTranslateProvider::Result result) {
++  std::move(callback).Run(std::move(result));
++}
++
++}  // namespace quick_translate
+diff --git a/chrome/browser/quick_translate/quick_translate_request.h b/chrome/browser/quick_translate/quick_translate_request.h
+new file mode 100644
+index 0000000000..0734949028
+--- /dev/null
++++ b/chrome/browser/quick_translate/quick_translate_request.h
+@@ -0,0 +1,50 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_REQUEST_H_
++#define CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_REQUEST_H_
++
++#include <string>
++
++#include "base/functional/callback.h"
++#include "base/memory/weak_ptr.h"
++#include "chrome/browser/quick_translate/quick_translate_provider.h"
++
++class Profile;
++
++namespace quick_translate {
++
++// A single, per-context-menu-invocation translation attempt. Owned by
++// whoever displays the result (the Views inline preview), not by
++// QuickTranslateService - unlike the profile-scoped provider, this object's
++// lifetime matches one open context menu. Its own WeakPtrFactory ensures
++// that closing the menu mid-translation simply drops the eventual result
++// instead of calling into a destroyed UI object.
++class QuickTranslateRequest {
++ public:
++  using ResultCallback =
++      base::OnceCallback<void(QuickTranslateProvider::Result)>;
++
++  QuickTranslateRequest();
++  ~QuickTranslateRequest();
++
++  QuickTranslateRequest(const QuickTranslateRequest&) = delete;
++  QuickTranslateRequest& operator=(const QuickTranslateRequest&) = delete;
++
++  // Starts translating `selection_text` using `profile`'s configured
++  // QuickTranslateProvider. `callback` is invoked exactly once, unless
++  // `this` is destroyed first, in which case it is never invoked.
++  void Start(Profile* profile,
++            const std::u16string& selection_text,
++            ResultCallback callback);
++
++ private:
++  void OnResult(ResultCallback callback, QuickTranslateProvider::Result result);
++
++  base::WeakPtrFactory<QuickTranslateRequest> weak_ptr_factory_{this};
++};
++
++}  // namespace quick_translate
++
++#endif  // CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_REQUEST_H_
+diff --git a/chrome/browser/quick_translate/quick_translate_service.cc b/chrome/browser/quick_translate/quick_translate_service.cc
+new file mode 100644
+index 0000000000..0f9f06bd3a
+--- /dev/null
++++ b/chrome/browser/quick_translate/quick_translate_service.cc
+@@ -0,0 +1,20 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/quick_translate/quick_translate_service.h"
++
++#include "chrome/browser/quick_translate/fallback_quick_translate_provider.h"
++
++namespace quick_translate {
++
++QuickTranslateService::QuickTranslateService(Profile* profile)
++    : provider_(std::make_unique<FallbackQuickTranslateProvider>(profile)) {}
++
++QuickTranslateService::~QuickTranslateService() = default;
++
++QuickTranslateProvider* QuickTranslateService::GetProvider() {
++  return provider_.get();
++}
++
++}  // namespace quick_translate
+diff --git a/chrome/browser/quick_translate/quick_translate_service.h b/chrome/browser/quick_translate/quick_translate_service.h
+new file mode 100644
+index 0000000000..2607e1cf56
+--- /dev/null
++++ b/chrome/browser/quick_translate/quick_translate_service.h
+@@ -0,0 +1,38 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_SERVICE_H_
++#define CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_SERVICE_H_
++
++#include <memory>
++
++#include "components/keyed_service/core/keyed_service.h"
++
++class Profile;
++
++namespace quick_translate {
++
++class QuickTranslateProvider;
++
++// Per-profile owner of the QuickTranslateProvider backend. Kept as its own
++// KeyedService (rather than having QuickTranslateRequest construct a
++// provider directly) so a future remote provider can be selected here based
++// on a user setting, with no change needed anywhere else.
++class QuickTranslateService : public KeyedService {
++ public:
++  explicit QuickTranslateService(Profile* profile);
++  ~QuickTranslateService() override;
++
++  QuickTranslateService(const QuickTranslateService&) = delete;
++  QuickTranslateService& operator=(const QuickTranslateService&) = delete;
++
++  QuickTranslateProvider* GetProvider();
++
++ private:
++  std::unique_ptr<QuickTranslateProvider> provider_;
++};
++
++}  // namespace quick_translate
++
++#endif  // CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_SERVICE_H_
+diff --git a/chrome/browser/quick_translate/quick_translate_service_factory.cc b/chrome/browser/quick_translate/quick_translate_service_factory.cc
+new file mode 100644
+index 0000000000..3621eae5ba
+--- /dev/null
++++ b/chrome/browser/quick_translate/quick_translate_service_factory.cc
+@@ -0,0 +1,43 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/quick_translate/quick_translate_service_factory.h"
++
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/profiles/profile_selections.h"
++#include "chrome/browser/quick_translate/quick_translate_service.h"
++
++namespace quick_translate {
++
++// static
++QuickTranslateServiceFactory* QuickTranslateServiceFactory::GetInstance() {
++  static base::NoDestructor<QuickTranslateServiceFactory> instance;
++  return instance.get();
++}
++
++// static
++QuickTranslateService* QuickTranslateServiceFactory::GetForProfile(
++    Profile* profile) {
++  return static_cast<QuickTranslateService*>(
++      GetInstance()->GetServiceForBrowserContext(profile, true));
++}
++
++QuickTranslateServiceFactory::QuickTranslateServiceFactory()
++    : ProfileKeyedServiceFactory(
++          "QuickTranslateService",
++          ProfileSelections::Builder()
++              .WithRegular(ProfileSelection::kOwnInstance)
++              .WithGuest(ProfileSelection::kOwnInstance)
++              .Build()) {}
++
++QuickTranslateServiceFactory::~QuickTranslateServiceFactory() = default;
++
++std::unique_ptr<KeyedService>
++QuickTranslateServiceFactory::BuildServiceInstanceForBrowserContext(
++    content::BrowserContext* context) const {
++  return std::make_unique<QuickTranslateService>(
++      Profile::FromBrowserContext(context));
++}
++
++}  // namespace quick_translate
+diff --git a/chrome/browser/quick_translate/quick_translate_service_factory.h b/chrome/browser/quick_translate/quick_translate_service_factory.h
+new file mode 100644
+index 0000000000..6b60c99908
+--- /dev/null
++++ b/chrome/browser/quick_translate/quick_translate_service_factory.h
+@@ -0,0 +1,39 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_SERVICE_FACTORY_H_
++#define CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_SERVICE_FACTORY_H_
++
++#include "base/no_destructor.h"
++#include "chrome/browser/profiles/profile_keyed_service_factory.h"
++
++class Profile;
++
++namespace quick_translate {
++
++class QuickTranslateService;
++
++class QuickTranslateServiceFactory : public ProfileKeyedServiceFactory {
++ public:
++  static QuickTranslateServiceFactory* GetInstance();
++  static QuickTranslateService* GetForProfile(Profile* profile);
++
++  QuickTranslateServiceFactory(const QuickTranslateServiceFactory&) = delete;
++  QuickTranslateServiceFactory& operator=(const QuickTranslateServiceFactory&) =
++      delete;
++
++ private:
++  friend base::NoDestructor<QuickTranslateServiceFactory>;
++
++  QuickTranslateServiceFactory();
++  ~QuickTranslateServiceFactory() override;
++
++  // BrowserContextKeyedServiceFactory:
++  std::unique_ptr<KeyedService> BuildServiceInstanceForBrowserContext(
++      content::BrowserContext* context) const override;
++};
++
++}  // namespace quick_translate
++
++#endif  // CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_SERVICE_FACTORY_H_
+diff --git a/chrome/browser/quick_translate/remote_quick_translate_provider.cc b/chrome/browser/quick_translate/remote_quick_translate_provider.cc
+new file mode 100644
+index 0000000000..de131ae699
+--- /dev/null
++++ b/chrome/browser/quick_translate/remote_quick_translate_provider.cc
+@@ -0,0 +1,207 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/quick_translate/remote_quick_translate_provider.h"
++
++#include <utility>
++
++#include "base/functional/bind.h"
++#include "base/json/json_reader.h"
++#include "base/logging.h"
++#include "base/strings/utf_string_conversions.h"
++#include "base/task/single_thread_task_runner.h"
++#include "base/time/time.h"
++#include "base/values.h"
++#include "chrome/browser/profiles/profile.h"
++#include "net/base/url_util.h"
++#include "net/traffic_annotation/network_traffic_annotation.h"
++#include "services/network/public/cpp/resource_request.h"
++#include "services/network/public/cpp/shared_url_loader_factory.h"
++#include "services/network/public/cpp/simple_url_loader.h"
++#include "url/gurl.h"
++
++namespace quick_translate {
++
++namespace {
++
++using Status = QuickTranslateProvider::Status;
++
++// Google's unofficial, key-less translation endpoint - the same one used by
++// countless browser extensions and command-line tools. "client=gtx" selects
++// this public frontend; "dt=t" asks for translated-text segments only.
++constexpr char kTranslateEndpoint[] =
++    "https://translate.googleapis.com/translate_a/single";
++
++constexpr size_t kMaxResponseBytes = 64 * 1024;
++constexpr base::TimeDelta kRequestTimeout = base::Seconds(5);
++
++// Total attempts made before giving up on one Translate() call, including
++// the first - i.e. up to 2 reconnect retries after an initial failure.
++// Covers transient blips (a dropped wifi packet, a momentary DNS hiccup)
++// that a single 5s-timeout request has no chance to recover from on its
++// own; SimpleURLLoader::SetRetryOptions() was considered instead, but its
++// RETRY_ON_* modes don't cover a plain request timeout, which is the
++// failure this endpoint hits most often.
++constexpr int kMaxAttempts = 3;
++constexpr base::TimeDelta kRetryDelay = base::Milliseconds(750);
++
++constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotationTag =
++    net::DefineNetworkTrafficAnnotation("quick_translate_remote", R"(
++        semantics {
++          sender: "Quick Translate"
++          description:
++            "Sends the text the user selected on a page, and the user's "
++            "configured target language, to Google's public translation "
++            "endpoint, for the 'Quick Translate' context-menu preview."
++          trigger:
++            "The user right-clicks selected page text with 'Use an "
++            "online model for Quick Translate' enabled in "
++            "chrome://settings/languages."
++          data:
++            "The selected text and the target language code. No cookies "
++            "or other identifying data are sent."
++          destination: GOOGLE_OWNED_SERVICE
++          internal {
++            contacts {
++              email: "contact@aerlab.net"
++            }
++          }
++          user_data {
++            type: NONE
++          }
++          last_reviewed: "2026-09-02"
++        }
++        policy {
++          cookies_allowed: NO
++          cookies_store: ""
++          setting:
++            "This feature is disabled by default and is enabled by the "
++            "user via the 'Use an online model for Quick Translate' "
++            "toggle in chrome://settings/languages."
++          policy_exception_justification:
++            "Not implemented yet. NBrowser has no enterprise policy "
++            "support."
++        })");
++
++GURL BuildRequestUrl(const std::u16string& text,
++                     const std::string& target_lang) {
++  GURL url(kTranslateEndpoint);
++  url = net::AppendOrReplaceQueryParameter(url, "client", "gtx");
++  url = net::AppendOrReplaceQueryParameter(url, "sl", "auto");
++  url = net::AppendOrReplaceQueryParameter(url, "dt", "t");
++  url = net::AppendOrReplaceQueryParameter(url, "tl", target_lang);
++  url = net::AppendOrReplaceQueryParameter(url, "q", base::UTF16ToUTF8(text));
++  return url;
++}
++
++// Extracts the translated text from the endpoint's response, which is an
++// unofficial, undocumented top-level JSON array (not an object) shaped
++// roughly like:
++//   [[[translated_segment, original_segment, ...], ...], null, source_lang]
++// Returns std::nullopt if `body` doesn't match this shape.
++std::optional<std::u16string> ExtractTranslatedText(
++    const base::ListValue& segments) {
++  std::u16string translated_text;
++  for (const base::Value& segment_value : segments) {
++    if (!segment_value.is_list()) {
++      return std::nullopt;
++    }
++    const base::ListValue& segment = segment_value.GetList();
++    if (segment.empty() || !segment[0].is_string()) {
++      return std::nullopt;
++    }
++    translated_text += base::UTF8ToUTF16(segment[0].GetString());
++  }
++  return translated_text;
++}
++
++}  // namespace
++
++RemoteQuickTranslateProvider::RemoteQuickTranslateProvider(Profile* profile)
++    : profile_(profile) {}
++
++RemoteQuickTranslateProvider::~RemoteQuickTranslateProvider() = default;
++
++void RemoteQuickTranslateProvider::Translate(const std::u16string& text,
++                                             const std::string& target_lang,
++                                             ResultCallback callback) {
++  StartRequest(text, target_lang, kMaxAttempts, std::move(callback));
++}
++
++void RemoteQuickTranslateProvider::StartRequest(std::u16string text,
++                                                std::string target_lang,
++                                                int attempts_left,
++                                                ResultCallback callback) {
++  auto resource_request = std::make_unique<network::ResourceRequest>();
++  resource_request->url = BuildRequestUrl(text, target_lang);
++  resource_request->credentials_mode = network::mojom::CredentialsMode::kOmit;
++
++  auto loader = network::SimpleURLLoader::Create(std::move(resource_request),
++                                                 kTrafficAnnotationTag);
++  loader->SetTimeoutDuration(kRequestTimeout);
++  network::SimpleURLLoader* raw_loader = loader.get();
++  raw_loader->DownloadToString(
++      profile_->GetURLLoaderFactory().get(),
++      base::BindOnce(&RemoteQuickTranslateProvider::OnResponse,
++                     weak_ptr_factory_.GetWeakPtr(), std::move(loader), text,
++                     target_lang, attempts_left, std::move(callback)),
++      kMaxResponseBytes);
++}
++
++void RemoteQuickTranslateProvider::OnResponse(
++    std::unique_ptr<network::SimpleURLLoader> loader,
++    std::u16string text,
++    std::string target_lang,
++    int attempts_left,
++    ResultCallback callback,
++    std::optional<std::string> response_body) {
++  Result result;
++  result.target_language = target_lang;
++
++  std::optional<base::ListValue> parsed;
++  if (response_body) {
++    parsed = base::JSONReader::ReadList(*response_body, base::JSON_PARSE_RFC);
++  }
++
++  std::optional<std::u16string> translated_text;
++  if (parsed && parsed->size() >= 3 && (*parsed)[0].is_list() &&
++      (*parsed)[2].is_string()) {
++    translated_text = ExtractTranslatedText((*parsed)[0].GetList());
++  }
++
++  if (!translated_text) {
++    int net_error = loader->NetError();
++    attempts_left--;
++    if (attempts_left > 0) {
++      LOG(WARNING) << "Quick Translate: remote request failed (net error "
++                   << net_error << "), " << attempts_left
++                   << " attempt(s) left, retrying.";
++      base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
++          FROM_HERE,
++          base::BindOnce(&RemoteQuickTranslateProvider::StartRequest,
++                         weak_ptr_factory_.GetWeakPtr(), std::move(text),
++                         std::move(target_lang), attempts_left,
++                         std::move(callback)),
++          kRetryDelay);
++      return;
++    }
++    LOG(WARNING) << "Quick Translate: remote request failed (net error "
++                 << net_error << "), giving up after " << kMaxAttempts
++                 << " attempt(s).";
++    result.status = Status::kError;
++    std::move(callback).Run(std::move(result));
++    return;
++  }
++
++  result.source_language = (*parsed)[2].GetString();
++  if (result.source_language == target_lang) {
++    result.status = Status::kSameLanguage;
++  } else {
++    result.status = Status::kOk;
++    result.translated_text = std::move(*translated_text);
++  }
++  std::move(callback).Run(std::move(result));
++}
++
++}  // namespace quick_translate
+diff --git a/chrome/browser/quick_translate/remote_quick_translate_provider.h b/chrome/browser/quick_translate/remote_quick_translate_provider.h
+new file mode 100644
+index 0000000000..c9f7c998d0
+--- /dev/null
++++ b/chrome/browser/quick_translate/remote_quick_translate_provider.h
+@@ -0,0 +1,75 @@
++// Copyright 2026 The NBrowser Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_QUICK_TRANSLATE_REMOTE_QUICK_TRANSLATE_PROVIDER_H_
++#define CHROME_BROWSER_QUICK_TRANSLATE_REMOTE_QUICK_TRANSLATE_PROVIDER_H_
++
++#include <memory>
++#include <optional>
++#include <string>
++
++#include "base/memory/raw_ptr.h"
++#include "base/memory/weak_ptr.h"
++#include "chrome/browser/quick_translate/quick_translate_provider.h"
++
++class Profile;
++
++namespace network {
++class SimpleURLLoader;
++}  // namespace network
++
++namespace quick_translate {
++
++// Translates text via Google's public, key-less "gtx" translation endpoint.
++// Unlike LocalQuickTranslateProvider, it supports arbitrary language pairs
++// (the source language is auto-detected server-side) but requires network
++// connectivity.
++//
++// This is a leaf network helper, not itself a QuickTranslateProvider: it
++// has no notion of the user's target-language preference, and its result
++// never carries anything but kOk or kError. FallbackQuickTranslateProvider
++// is the QuickTranslateProvider that actually uses this, layering in the
++// target-language lookup and the local-engine fallback.
++class RemoteQuickTranslateProvider {
++ public:
++  using Result = QuickTranslateProvider::Result;
++  using ResultCallback = QuickTranslateProvider::ResultCallback;
++
++  explicit RemoteQuickTranslateProvider(Profile* profile);
++  ~RemoteQuickTranslateProvider();
++
++  RemoteQuickTranslateProvider(const RemoteQuickTranslateProvider&) = delete;
++  RemoteQuickTranslateProvider& operator=(
++      const RemoteQuickTranslateProvider&) = delete;
++
++  // Translates `text` to `target_lang`. Invokes `callback` exactly once,
++  // with Status::kOk or Status::kSameLanguage on success, or
++  // Status::kError if every retry (see kMaxAttempts in the .cc) failed due
++  // to a network failure, timeout, or malformed response - the caller
++  // decides what to do about that (e.g. fall back to a local engine).
++  void Translate(const std::u16string& text,
++                 const std::string& target_lang,
++                 ResultCallback callback);
++
++ private:
++  // Issues one request attempt; `attempts_left` counts this one, so
++  // `OnResponse` retries by calling this again with `attempts_left - 1`.
++  void StartRequest(std::u16string text,
++                    std::string target_lang,
++                    int attempts_left,
++                    ResultCallback callback);
++  void OnResponse(std::unique_ptr<network::SimpleURLLoader> loader,
++                   std::u16string text,
++                   std::string target_lang,
++                   int attempts_left,
++                   ResultCallback callback,
++                   std::optional<std::string> response_body);
++
++  raw_ptr<Profile> profile_;
++  base::WeakPtrFactory<RemoteQuickTranslateProvider> weak_ptr_factory_{this};
++};
++
++}  // namespace quick_translate
++
++#endif  // CHROME_BROWSER_QUICK_TRANSLATE_REMOTE_QUICK_TRANSLATE_PROVIDER_H_

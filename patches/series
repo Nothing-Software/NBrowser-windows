@@ -43,3 +43,8 @@ nbrowser/windows/windows-nbrowser-ui-strings-wiring.patch
 nbrowser/windows/windows-nbrowser-remove-about-license-text.patch
 nbrowser/windows/windows-nbrowser-fix-orphaned-translations.patch
 nbrowser/windows/windows-nbrowser-github-updater.patch
+nbrowser/windows/windows-nbrowser-quick-translate-service.patch
+nbrowser/windows/windows-nbrowser-quick-translate-context-menu.patch
+nbrowser/windows/windows-nbrowser-quick-translate-view.patch
+nbrowser/windows/windows-nbrowser-quick-translate-assets.patch
+nbrowser/windows/windows-nbrowser-quick-translate-settings.patch

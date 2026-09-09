@@ -1,0 +1,116 @@
+diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
+--- a/chrome/browser/prefs/browser_prefs.cc
++++ b/chrome/browser/prefs/browser_prefs.cc
+@@ -76,6 +76,7 @@
+ #include "chrome/browser/push_messaging/push_messaging_app_identifier.h"
+ #include "chrome/browser/push_messaging/push_messaging_service_impl.h"
+ #include "chrome/browser/push_messaging/push_messaging_unsubscribed_entry.h"
++#include "chrome/browser/quick_translate/quick_translate_prefs.h"
+ #include "chrome/browser/rlz/chrome_rlz_tracker_delegate.h"
+ #include "chrome/browser/search/background/ntp_custom_background_service.h"
+ #include "chrome/browser/search/search.h"
+@@ -1825,6 +1837,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
+   custom_handlers::ProtocolHandlerRegistry::RegisterProfilePrefs(registry);
+   PushMessagingAppIdentifier::RegisterProfilePrefs(registry);
+   PushMessagingUnsubscribedEntry::RegisterProfilePrefs(registry);
++  quick_translate::prefs::RegisterProfilePrefs(registry);
+   QuietNotificationPermissionUiState::RegisterProfilePrefs(registry);
+   regional_capabilities::prefs::RegisterProfilePrefs(registry);
+   RegisterBrowserUserPrefs(registry);
+diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn
+--- a/chrome/browser/prefs/BUILD.gn
++++ b/chrome/browser/prefs/BUILD.gn
+@@ -103,6 +103,7 @@ source_set("impl") {
+     "//chrome/browser/profiles:profile_util",
+     "//chrome/browser/push_messaging",
+     "//chrome/browser/push_messaging:service_impl_public",
++    "//chrome/browser/quick_translate:prefs",
+     "//chrome/browser/search",
+     "//chrome/browser/search/background",
+     "//chrome/browser/serial",
+diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+--- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
++++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+@@ -1448,6 +1421,19 @@ void AddLanguagesStrings(content::WebUIDataSource* html_source,
+        IDS_SETTINGS_LANGUAGES_OFFER_TO_ENABLE_TRANSLATE},
+       {"offerToEnableTranslateSublabel",
+        IDS_SETTINGS_LANGUAGES_OFFER_TO_ENABLE_TRANSLATE_SUBLABEL},
++      // NBrowser: Quick Translate settings card (chrome/browser/quick_translate/).
++      {"quickTranslatePageTitle", IDS_QUICK_TRANSLATE_PAGE_TITLE},
++      {"quickTranslateEnabledLabel", IDS_QUICK_TRANSLATE_SETTINGS_ENABLED_LABEL},
++      {"quickTranslateEnabledSublabel",
++       IDS_QUICK_TRANSLATE_SETTINGS_ENABLED_SUBLABEL},
++      {"quickTranslateUseOfflineModelLabel",
++       IDS_QUICK_TRANSLATE_SETTINGS_USE_OFFLINE_MODEL_LABEL},
++      {"quickTranslateUseOfflineModelSublabel",
++       IDS_QUICK_TRANSLATE_SETTINGS_USE_OFFLINE_MODEL_SUBLABEL},
++      {"quickTranslateUseOnlineModelLabel",
++       IDS_QUICK_TRANSLATE_SETTINGS_USE_ONLINE_MODEL_LABEL},
++      {"quickTranslateUseOnlineModelSublabel",
++       IDS_QUICK_TRANSLATE_SETTINGS_USE_ONLINE_MODEL_SUBLABEL},
+       {"noLanguagesAdded", IDS_SETTINGS_LANGUAGES_NO_LANGUAGES_ADDED},
+       {"addLanguageAriaLabel", IDS_SETTINGS_LANGUAGES_ADD_ARIA_LABEL},
+       {"removeAutomaticLanguageAriaLabel",
+diff --git a/chrome/browser/resources/settings/languages_page/translate_page.html b/chrome/browser/resources/settings/languages_page/translate_page.html
+index 47ee2c73fc..4e07092ece 100644
+--- a/chrome/browser/resources/settings/languages_page/translate_page.html
++++ b/chrome/browser/resources/settings/languages_page/translate_page.html
+@@ -1,4 +1,23 @@
+ <style include="cr-shared-style settings-shared md-select"></style>
++<settings-section page-title="$i18n{quickTranslatePageTitle}">
++<settings-toggle-button id="quickTranslateEnabled"
++    pref="{{prefs.quick_translate.enabled}}"
++    label="$i18n{quickTranslateEnabledLabel}"
++    sub-label="$i18n{quickTranslateEnabledSublabel}">
++</settings-toggle-button>
++<settings-toggle-button id="quickTranslateUseOfflineModel"
++    pref="{{prefs.quick_translate.use_offline_model}}"
++    label="$i18n{quickTranslateUseOfflineModelLabel}"
++    sub-label="$i18n{quickTranslateUseOfflineModelSublabel}"
++    disabled="[[!prefs.quick_translate.enabled.value]]">
++</settings-toggle-button>
++<settings-toggle-button id="quickTranslateUseOnlineModel"
++    pref="{{prefs.quick_translate.use_online_model}}"
++    label="$i18n{quickTranslateUseOnlineModelLabel}"
++    sub-label="$i18n{quickTranslateUseOnlineModelSublabel}"
++    disabled="[[!prefs.quick_translate.enabled.value]]">
++</settings-toggle-button>
++</settings-section>
+ <settings-section page-title="$i18n{translatePageTitle}">
+ <settings-toggle-button id="offerTranslateOtherLanguages"
+     pref="{{prefs.translate.enabled}}"
+diff --git a/chrome/browser/extensions/BUILD.gn b/chrome/browser/extensions/BUILD.gn
+--- a/chrome/browser/extensions/BUILD.gn
++++ b/chrome/browser/extensions/BUILD.gn
+@@ -533,6 +531,7 @@ source_set("extensions") {
+     "//chrome/browser/profiles:profile",
+     "//chrome/browser/profiles:profile_manager",
+     "//chrome/browser/profiles/keep_alive",
++    "//chrome/browser/quick_translate:prefs",
+     "//chrome/browser/renderer_host",
+     "//chrome/browser/resource_coordinator:utils",
+     "//chrome/browser/resources:component_extension_resources",
+diff --git a/chrome/browser/extensions/api/settings_private/prefs_util.cc b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+--- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
++++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+@@ -28,6 +28,7 @@
+ #include "chrome/browser/password_manager/generated_password_leak_detection_pref.h"
+ #include "chrome/browser/prefs/session_startup_pref.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/quick_translate/quick_translate_prefs.h"
+ #include "chrome/browser/safe_browsing/generated_safe_browsing_pref.h"
+ #include "chrome/browser/safe_browsing/generated_security_settings_bundle_pref.h"
+ #include "chrome/browser/ssl/generated_https_first_mode_pref.h"
+@@ -509,6 +494,12 @@ const PrefsUtil::TypedPrefMap& PrefsUtil::GetAllowlistedKeys() {
+       settings_api::PrefType::kBoolean;
+   (*s_allowlist)[translate::prefs::kOfferTranslateEnabled] =
+       settings_api::PrefType::kBoolean;
++  (*s_allowlist)[quick_translate::prefs::kQuickTranslateEnabled] =
++      settings_api::PrefType::kBoolean;
++  (*s_allowlist)[quick_translate::prefs::kQuickTranslateUseOfflineModel] =
++      settings_api::PrefType::kBoolean;
++  (*s_allowlist)[quick_translate::prefs::kQuickTranslateUseOnlineModel] =
++      settings_api::PrefType::kBoolean;
+   (*s_allowlist)[translate::prefs::kBlockedLanguages] =
+       settings_api::PrefType::kList;
+   (*s_allowlist)[translate::prefs::kPrefNeverPromptSitesWithTime] =
