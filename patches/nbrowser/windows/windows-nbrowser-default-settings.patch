@@ -11,7 +11,7 @@ index 45f00944bf..ddd90fd5fa 100644
  #include "components/sampling_profiler/thread_profiler.h"
  #include "components/startup_metric_utils/common/startup_metric_utils.h"
  #include "components/variations/service/variations_network_clock.h"
-@@ -1100,6 +1102,58 @@ std::optional<int> ChromeMainDelegate::BasicStartupComplete() {
+@@ -1100,6 +1102,82 @@ std::optional<int> ChromeMainDelegate::BasicStartupComplete() {
    // The DevTools remote debugging pipe file descriptors need to be checked
    // before any other files are opened, see https://crbug.com/40259890.
    const bool is_browser = !command_line.HasSwitch(switches::kProcessType);
@@ -40,16 +40,31 @@ index 45f00944bf..ddd90fd5fa 100644
 +    if (base::PathService::Get(base::DIR_ASSETS, &install_dir)) {
 +      base::FilePath translate_kit_dir =
 +          install_dir.AppendASCII("TranslateKitFiles");
-+      base::CommandLine::ForCurrentProcess()->AppendSwitchPath(
-+          on_device_translation::kTranslateKitBinaryPath,
-+          translate_kit_dir.Append(
-+              FILE_PATH_LITERAL("libtranslatekit.dll")));
-+      base::CommandLine::ForCurrentProcess()->AppendSwitchNative(
-+          "translate-kit-packages",
-+          FILE_PATH_LITERAL("en,ru,") +
-+              translate_kit_dir.Append(FILE_PATH_LITERAL("LanguagePacks"))
-+                  .Append(FILE_PATH_LITERAL("en_ru"))
-+                  .value());
++      base::FilePath translate_kit_binary =
++          translate_kit_dir.Append(FILE_PATH_LITERAL("libtranslatekit.dll"));
++      base::FilePath translate_kit_packages_dir =
++          translate_kit_dir.Append(FILE_PATH_LITERAL("LanguagePacks"))
++              .Append(FILE_PATH_LITERAL("en_ru"));
++      // NBrowser: these are bundled next to the binary (see
++      // //nbrowser_translatekit and chrome.release) rather than downloaded,
++      // so a missing file here means the install is incomplete, not a
++      // transient state - check for that explicitly instead of pointing
++      // TranslateKit at paths that don't exist and letting it fail deep
++      // inside CreateTranslator() with an unrelated-looking "unsupported
++      // language" error.
++      if (base::PathExists(translate_kit_binary) &&
++          base::PathExists(translate_kit_packages_dir)) {
++        base::CommandLine::ForCurrentProcess()->AppendSwitchPath(
++            on_device_translation::kTranslateKitBinaryPath,
++            translate_kit_binary);
++        base::CommandLine::ForCurrentProcess()->AppendSwitchNative(
++            "translate-kit-packages",
++            FILE_PATH_LITERAL("en,ru,") + translate_kit_packages_dir.value());
++      } else {
++        LOG(WARNING) << "Quick Translate: TranslateKit files missing under "
++                     << translate_kit_dir.value()
++                     << " - local on-device translation will be unavailable.";
++      }
 +
 +      // NBrowser: point local language detection (used to guess Quick
 +      // Translate's source language) at the model file bundled with this
@@ -59,12 +74,21 @@ index 45f00944bf..ddd90fd5fa 100644
 +      // own. --optimization-guide-model-override is a real, existing
 +      // upstream flag for exactly this ("point this optimization target at
 +      // a local file"), not something added for this feature.
-+      base::CommandLine::ForCurrentProcess()->AppendSwitchNative(
-+          optimization_guide::switches::kModelOverride,
-+          FILE_PATH_LITERAL("OPTIMIZATION_TARGET_LANGUAGE_DETECTION|") +
-+              install_dir.AppendASCII("LanguageDetectionModel")
-+                  .Append(FILE_PATH_LITERAL("model.tflite"))
-+                  .value());
++      base::FilePath language_detection_model =
++          install_dir.AppendASCII("LanguageDetectionModel")
++              .Append(FILE_PATH_LITERAL("model.tflite"));
++      if (base::PathExists(language_detection_model)) {
++        base::CommandLine::ForCurrentProcess()->AppendSwitchNative(
++            optimization_guide::switches::kModelOverride,
++            FILE_PATH_LITERAL("OPTIMIZATION_TARGET_LANGUAGE_DETECTION|") +
++                language_detection_model.value());
++      } else {
++        LOG(WARNING) << "Quick Translate: language detection model missing "
++                        "at "
++                     << language_detection_model.value()
++                     << " - source language auto-detection will be "
++                        "unavailable.";
++      }
 +    }
 +  }
  #if BUILDFLAG(IS_WIN)

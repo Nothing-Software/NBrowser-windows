@@ -293,10 +293,10 @@ index 0000000000..55511bde44
 +#endif  // CHROME_BROWSER_QUICK_TRANSLATE_FALLBACK_QUICK_TRANSLATE_PROVIDER_H_
 diff --git a/chrome/browser/quick_translate/local_quick_translate_provider.cc b/chrome/browser/quick_translate/local_quick_translate_provider.cc
 new file mode 100644
-index 0000000000..0f89cf8371
+index 0000000000..9bc13da448
 --- /dev/null
 +++ b/chrome/browser/quick_translate/local_quick_translate_provider.cc
-@@ -0,0 +1,201 @@
+@@ -0,0 +1,210 @@
 +// Copyright 2026 The NBrowser Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -307,6 +307,7 @@ index 0000000000..0f89cf8371
 +
 +#include "base/command_line.h"
 +#include "base/functional/bind.h"
++#include "base/logging.h"
 +#include "base/no_destructor.h"
 +#include "base/strings/utf_string_conversions.h"
 +#include "chrome/browser/language/language_model_manager_factory.h"
@@ -391,6 +392,8 @@ index 0000000000..0f89cf8371
 +  auto* service =
 +      LanguageDetectionModelServiceFactory::GetForProfile(profile_);
 +  if (!service) {
++    LOG(WARNING) << "Quick Translate: no LanguageDetectionModelService for "
++                    "this profile - source language will be undetected.";
 +    std::move(done).Run();
 +    return;
 +  }
@@ -403,6 +406,9 @@ index 0000000000..0f89cf8371
 +    base::OnceClosure done,
 +    base::File file) {
 +  if (!file.IsValid()) {
++    LOG(WARNING) << "Quick Translate: language detection model file is not "
++                    "valid - source language will be undetected. Check "
++                    "--optimization-guide-model-override.";
 +    std::move(done).Run();
 +    return;
 +  }
@@ -456,6 +462,9 @@ index 0000000000..0f89cf8371
 +    base::expected<mojo::PendingRemote<OnDeviceTranslator>,
 +                   CreateTranslatorError> result) {
 +  if (!result.has_value()) {
++    LOG(WARNING) << "Quick Translate: CreateTranslator(" << source_lang
++                 << " -> " << target_lang
++                 << ") failed, error=" << static_cast<int>(result.error());
 +    Result out;
 +    out.source_language = source_lang;
 +    out.target_language = target_lang;
@@ -1010,10 +1019,10 @@ index 0000000000..6b60c99908
 +#endif  // CHROME_BROWSER_QUICK_TRANSLATE_QUICK_TRANSLATE_SERVICE_FACTORY_H_
 diff --git a/chrome/browser/quick_translate/remote_quick_translate_provider.cc b/chrome/browser/quick_translate/remote_quick_translate_provider.cc
 new file mode 100644
-index 0000000000..041af5be26
+index 0000000000..de131ae699
 --- /dev/null
 +++ b/chrome/browser/quick_translate/remote_quick_translate_provider.cc
-@@ -0,0 +1,168 @@
+@@ -0,0 +1,207 @@
 +// Copyright 2026 The NBrowser Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -1024,7 +1033,9 @@ index 0000000000..041af5be26
 +
 +#include "base/functional/bind.h"
 +#include "base/json/json_reader.h"
++#include "base/logging.h"
 +#include "base/strings/utf_string_conversions.h"
++#include "base/task/single_thread_task_runner.h"
 +#include "base/time/time.h"
 +#include "base/values.h"
 +#include "chrome/browser/profiles/profile.h"
@@ -1049,6 +1060,16 @@ index 0000000000..041af5be26
 +
 +constexpr size_t kMaxResponseBytes = 64 * 1024;
 +constexpr base::TimeDelta kRequestTimeout = base::Seconds(5);
++
++// Total attempts made before giving up on one Translate() call, including
++// the first - i.e. up to 2 reconnect retries after an initial failure.
++// Covers transient blips (a dropped wifi packet, a momentary DNS hiccup)
++// that a single 5s-timeout request has no chance to recover from on its
++// own; SimpleURLLoader::SetRetryOptions() was considered instead, but its
++// RETRY_ON_* modes don't cover a plain request timeout, which is the
++// failure this endpoint hits most often.
++constexpr int kMaxAttempts = 3;
++constexpr base::TimeDelta kRetryDelay = base::Milliseconds(750);
 +
 +constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotationTag =
 +    net::DefineNetworkTrafficAnnotation("quick_translate_remote", R"(
@@ -1130,6 +1151,13 @@ index 0000000000..041af5be26
 +void RemoteQuickTranslateProvider::Translate(const std::u16string& text,
 +                                             const std::string& target_lang,
 +                                             ResultCallback callback) {
++  StartRequest(text, target_lang, kMaxAttempts, std::move(callback));
++}
++
++void RemoteQuickTranslateProvider::StartRequest(std::u16string text,
++                                                std::string target_lang,
++                                                int attempts_left,
++                                                ResultCallback callback) {
 +  auto resource_request = std::make_unique<network::ResourceRequest>();
 +  resource_request->url = BuildRequestUrl(text, target_lang);
 +  resource_request->credentials_mode = network::mojom::CredentialsMode::kOmit;
@@ -1141,14 +1169,16 @@ index 0000000000..041af5be26
 +  raw_loader->DownloadToString(
 +      profile_->GetURLLoaderFactory().get(),
 +      base::BindOnce(&RemoteQuickTranslateProvider::OnResponse,
-+                     weak_ptr_factory_.GetWeakPtr(), std::move(loader),
-+                     target_lang, std::move(callback)),
++                     weak_ptr_factory_.GetWeakPtr(), std::move(loader), text,
++                     target_lang, attempts_left, std::move(callback)),
 +      kMaxResponseBytes);
 +}
 +
 +void RemoteQuickTranslateProvider::OnResponse(
 +    std::unique_ptr<network::SimpleURLLoader> loader,
++    std::u16string text,
 +    std::string target_lang,
++    int attempts_left,
 +    ResultCallback callback,
 +    std::optional<std::string> response_body) {
 +  Result result;
@@ -1166,6 +1196,24 @@ index 0000000000..041af5be26
 +  }
 +
 +  if (!translated_text) {
++    int net_error = loader->NetError();
++    attempts_left--;
++    if (attempts_left > 0) {
++      LOG(WARNING) << "Quick Translate: remote request failed (net error "
++                   << net_error << "), " << attempts_left
++                   << " attempt(s) left, retrying.";
++      base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
++          FROM_HERE,
++          base::BindOnce(&RemoteQuickTranslateProvider::StartRequest,
++                         weak_ptr_factory_.GetWeakPtr(), std::move(text),
++                         std::move(target_lang), attempts_left,
++                         std::move(callback)),
++          kRetryDelay);
++      return;
++    }
++    LOG(WARNING) << "Quick Translate: remote request failed (net error "
++                 << net_error << "), giving up after " << kMaxAttempts
++                 << " attempt(s).";
 +    result.status = Status::kError;
 +    std::move(callback).Run(std::move(result));
 +    return;
@@ -1184,10 +1232,10 @@ index 0000000000..041af5be26
 +}  // namespace quick_translate
 diff --git a/chrome/browser/quick_translate/remote_quick_translate_provider.h b/chrome/browser/quick_translate/remote_quick_translate_provider.h
 new file mode 100644
-index 0000000000..bdcee64fd8
+index 0000000000..c9f7c998d0
 --- /dev/null
 +++ b/chrome/browser/quick_translate/remote_quick_translate_provider.h
-@@ -0,0 +1,67 @@
+@@ -0,0 +1,75 @@
 +// Copyright 2026 The NBrowser Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -1235,16 +1283,24 @@ index 0000000000..bdcee64fd8
 +
 +  // Translates `text` to `target_lang`. Invokes `callback` exactly once,
 +  // with Status::kOk or Status::kSameLanguage on success, or
-+  // Status::kError for any network failure, timeout, or malformed
-+  // response - the caller decides what to do about that (e.g. fall back to
-+  // a local engine).
++  // Status::kError if every retry (see kMaxAttempts in the .cc) failed due
++  // to a network failure, timeout, or malformed response - the caller
++  // decides what to do about that (e.g. fall back to a local engine).
 +  void Translate(const std::u16string& text,
 +                 const std::string& target_lang,
 +                 ResultCallback callback);
 +
 + private:
++  // Issues one request attempt; `attempts_left` counts this one, so
++  // `OnResponse` retries by calling this again with `attempts_left - 1`.
++  void StartRequest(std::u16string text,
++                    std::string target_lang,
++                    int attempts_left,
++                    ResultCallback callback);
 +  void OnResponse(std::unique_ptr<network::SimpleURLLoader> loader,
++                   std::u16string text,
 +                   std::string target_lang,
++                   int attempts_left,
 +                   ResultCallback callback,
 +                   std::optional<std::string> response_body);
 +

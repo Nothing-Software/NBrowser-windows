@@ -16,16 +16,22 @@ diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
 diff --git a/chrome/installer/mini_installer/chrome.release b/chrome/installer/mini_installer/chrome.release
 --- a/chrome/installer/mini_installer/chrome.release
 +++ b/chrome/installer/mini_installer/chrome.release
-@@ -106,6 +106,19 @@ WidevineCdm\_platform_specific\win_x64\widevinecdm.dll.sig: %(VersionDir)s\Widev
- WidevineCdm\_platform_specific\win_arm64\widevinecdm.dll: %(VersionDir)s\WidevineCdm\_platform_specific\win_arm64\
- WidevineCdm\_platform_specific\win_arm64\widevinecdm.dll.sig: %(VersionDir)s\WidevineCdm\_platform_specific\win_arm64\
-
+@@ -70,6 +70,25 @@
+ IwaKeyDistribution\iwa-key-distribution.pb: %(VersionDir)s\IwaKeyDistribution\
+ IwaKeyDistribution\manifest.json: %(VersionDir)s\IwaKeyDistribution\
+ 
 +#
 +# NBrowser: Quick Translate's vendored on-device TranslateKit engine + en-ru
 +# language pack (see //nbrowser_translatekit and
 +# chrome/browser/quick_translate/) - bundled the same way as WidevineCdm
 +# above, since ungoogled-chromium's block-requests.patch disables the normal
-+# component-updater download for this too.
++# component-updater download for this too. Deliberately in [GENERAL], not
++# [GOOGLE_CHROME]: create_installer_archive.py only copies the latter when
++# --distribution is "_google_chrome", which this fork's build never passes -
++# WidevineCdm belongs there for real (its license terms gate it to Google's
++# own branded builds), but that's not a reason that applies to this engine,
++# and putting it there was why the installer never shipped these files even
++# though the plain ninja build output always had them.
 +#
 +TranslateKitFiles\libtranslatekit.dll: %(VersionDir)s\TranslateKitFiles\
 +TranslateKitFiles\LanguagePacks\en_ru\en_ru_dictionary\*.*: %(VersionDir)s\TranslateKitFiles\LanguagePacks\en_ru\en_ru_dictionary\
@@ -33,6 +39,26 @@ diff --git a/chrome/installer/mini_installer/chrome.release b/chrome/installer/m
 +TranslateKitFiles\LanguagePacks\en_ru\ru_en_nmt\*.*: %(VersionDir)s\TranslateKitFiles\LanguagePacks\en_ru\ru_en_nmt\
 +LanguageDetectionModel\model.tflite: %(VersionDir)s\LanguageDetectionModel\
 +
+ [HIDPI]
+ chrome_200_percent.pak: %(VersionDir)s\
+ 
+@@ -106,19 +125,6 @@
+ WidevineCdm\_platform_specific\win_arm64\widevinecdm.dll: %(VersionDir)s\WidevineCdm\_platform_specific\win_arm64\
+ WidevineCdm\_platform_specific\win_arm64\widevinecdm.dll.sig: %(VersionDir)s\WidevineCdm\_platform_specific\win_arm64\
+ 
+-#
+-# NBrowser: Quick Translate's vendored on-device TranslateKit engine + en-ru
+-# language pack (see //nbrowser_translatekit and
+-# chrome/browser/quick_translate/) - bundled the same way as WidevineCdm
+-# above, since ungoogled-chromium's block-requests.patch disables the normal
+-# component-updater download for this too.
+-#
+-TranslateKitFiles\libtranslatekit.dll: %(VersionDir)s\TranslateKitFiles\
+-TranslateKitFiles\LanguagePacks\en_ru\en_ru_dictionary\*.*: %(VersionDir)s\TranslateKitFiles\LanguagePacks\en_ru\en_ru_dictionary\
+-TranslateKitFiles\LanguagePacks\en_ru\en_ru_nmt\*.*: %(VersionDir)s\TranslateKitFiles\LanguagePacks\en_ru\en_ru_nmt\
+-TranslateKitFiles\LanguagePacks\en_ru\ru_en_nmt\*.*: %(VersionDir)s\TranslateKitFiles\LanguagePacks\en_ru\ru_en_nmt\
+-LanguageDetectionModel\model.tflite: %(VersionDir)s\LanguageDetectionModel\
+-
  [SNAPSHOTBLOB]
  # The snapshot_blob.bin V8 snapshot is needed in builds that don't use
  # v8_context_snapshot.bin, such as Linux-Windows cross-builds.
@@ -129,3 +155,38 @@ index 0000000000..1159ef0cff
 +    ":translatekit_ru_en_nmt",
 +  ]
 +}
+diff --git a/chrome/tools/build/win/FILES.cfg b/chrome/tools/build/win/FILES.cfg
+--- a/chrome/tools/build/win/FILES.cfg
++++ b/chrome/tools/build/win/FILES.cfg
+@@ -359,6 +359,31 @@
+     'arch': ['arm'],
+     'buildtype': ['official'],
+   },
++  # NBrowser: Quick Translate's vendored on-device TranslateKit engine +
++  # en-ru language pack (see //nbrowser_translatekit and
++  # chrome/browser/quick_translate/) - mirrors chrome.release's [GENERAL]
++  # entries of the same name, needed here too since package.py's .zip
++  # output is built from this file instead of going through mini_installer.
++  {
++    'filename': 'TranslateKitFiles/libtranslatekit.dll',
++    'buildtype': ['official'],
++  },
++  {
++    'filename': 'TranslateKitFiles/LanguagePacks/en_ru/en_ru_dictionary/*',
++    'buildtype': ['official'],
++  },
++  {
++    'filename': 'TranslateKitFiles/LanguagePacks/en_ru/en_ru_nmt/*',
++    'buildtype': ['official'],
++  },
++  {
++    'filename': 'TranslateKitFiles/LanguagePacks/en_ru/ru_en_nmt/*',
++    'buildtype': ['official'],
++  },
++  {
++    'filename': 'LanguageDetectionModel/model.tflite',
++    'buildtype': ['official'],
++  },
+   # ANGLE files:
+   {
+     'filename': 'D3DCompiler_47.dll',
